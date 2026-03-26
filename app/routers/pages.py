@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import has_any_admin, hash_password, login_user, session_admin_user
 from app.crypto_util import encrypt_secret
 from app.db import get_db
+from app.log_reader import log_file_path, read_requests_log_tail
 from app.models import AdminUser, GlobalSettings, MonitoredTarget, Provider
 from app.services.probe import run_all_enabled_probes
 from app.version_info import get_version
@@ -362,6 +363,35 @@ def admin_settings_save(
 
     reschedule_from_db()
     return RedirectResponse("/admin/settings?msg=saved", status_code=302)
+
+
+@router.get("/admin/logs")
+def admin_logs(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    lines: int = Query(500, ge=50, le=3000),
+):
+    u = _need_user(request, db)
+    if isinstance(u, RedirectResponse):
+        return u
+    text, files = read_requests_log_tail(lines)
+    path = log_file_path()
+    if not text.strip():
+        if path.is_file() and path.stat().st_size == 0:
+            text = "(файл пуст)"
+        elif not path.is_file():
+            text = "(файл requests.log ещё не создан — сделайте запросы к приложению или дождитесь старта)"
+        else:
+            text = "(нет строк в выбранном диапазоне)"
+    return _tpl(
+        request,
+        "logs.html",
+        user=u,
+        log_text=text,
+        log_files=files,
+        lines=lines,
+        log_path=str(path.resolve()),
+    )
 
 
 @router.post("/admin/run-now")

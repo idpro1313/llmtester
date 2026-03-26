@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Лог запросов{% endblock %}
+{% block content %}
+<h1>Лог HTTP-запросов</h1>
+<p class="muted">Источник: <code>{{ log_path }}</code> (ротация при росте файла). Показаны последние строки текущего файла.</p>
+
+<form method="get" class="log-toolbar">
+  <label>Строк с конца
+    <input type="number" name="lines" value="{{ lines }}" min="50" max="3000" step="50" />
+  </label>
+  <button type="submit">Показать</button>
+  <a class="btn-link" href="{{ request.url.path }}?lines={{ lines }}">Обновить</a>
+</form>
+
+{% if log_files %}
+<ul class="muted log-files-meta">
+  {% for f in log_files %}
+  <li><code>{{ f.path.name }}</code> — {{ (f.size_bytes / 1024) | round(1) }} КиБ</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<pre class="log-view" id="log_pre">{{ log_text }}</pre>
+<p class="muted">Новые записи внизу файла; здесь выводится хвост. Запросы к <code>/static</code>, <code>/health</code> и <code>/favicon.ico</code> в лог не пишутся.</p>
+{% endblock %}
