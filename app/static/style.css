@@ -142,31 +142,30 @@ button.link.danger { color: var(--err); }
 }
 .controls label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
 
+/* Два столбца, как только в .main помещается minmax; без full-width у «третьего» графика. */
 .charts {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 1.25rem;
   margin: 1rem 0 2rem;
+  align-items: stretch;
 }
 .chart-box {
   width: 100%;
-  min-height: 360px;
-  height: clamp(360px, 48vh, 640px);
+  min-height: 300px;
+  height: clamp(300px, 38vh, 520px);
+  max-height: 520px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.65rem 0.75rem 0.5rem;
   position: relative;
+  grid-column: auto;
 }
 .chart-box canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
-}
-@media (min-width: 1400px) {
-  .charts {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 .data.dashboard-summary {
