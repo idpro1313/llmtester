@@ -81,7 +81,13 @@
         return;
       }
       if (!d.ok) {
-        status.textContent = d.message || d.error || 'Ошибка';
+        var parts = [d.message || d.error || 'Ошибка'];
+        if (d.upstream_url) {
+          parts.push('URL: ' + d.upstream_url);
+        } else if (d.provider_base_url) {
+          parts.push('Base URL провайдера: ' + d.provider_base_url);
+        }
+        status.textContent = parts.join(' — ');
         status.className = 'muted err';
         return;
       }

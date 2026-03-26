@@ -14,7 +14,8 @@ from app.middleware.body_log import body_bytes_to_log_line
 _log = logging.getLogger(ACCESS_LOGGER_NAME)
 
 
-def _models_url(base_url: str) -> str:
+def models_endpoint_url(base_url: str) -> str:
+    """Полный URL запроса списка моделей (base_url из настроек провайдера + /models)."""
     return f"{base_url.rstrip('/')}/models"
 
 
@@ -39,9 +40,10 @@ def list_model_ids(base_url: str, api_key: str) -> tuple[list[str], str | None]:
     Возвращает (отсортированные уникальные id моделей, None) или ([], сообщение_об_ошибке).
     Исходящий запрос пишется в тот же лог, что и входящие HTTP (requests.log).
     """
-    url = _models_url(base_url)
+    url = models_endpoint_url(base_url)
     timeout = httpx.Timeout(connect=8.0, read=22.0, write=10.0, pool=5.0)
     t0 = time.perf_counter()
+    _log.info("upstream begin GET %s (таймауты httpx: connect=8s read=22s)", url)
     try:
         with httpx.Client(timeout=timeout) as client:
             r = client.get(
@@ -59,12 +61,13 @@ def list_model_ids(base_url: str, api_key: str) -> tuple[list[str], str | None]:
         _log.info("  upstream_resp: %s", body_bytes_to_log_line(body, ct))
 
         if r.status_code >= 400:
-            return [], _message_from_error_body(body, r.status_code)
+            detail = _message_from_error_body(body, r.status_code)
+            return [], f"{detail} (запрос: {url})"
 
         try:
             data = r.json()
         except json.JSONDecodeError as e:
-            return [], f"Некорректный JSON в ответе: {e}"
+            return [], f"Некорректный JSON в ответе от {url}: {e}"
 
         raw: list[str] = []
         for item in data.get("data") or []:
@@ -73,18 +76,18 @@ def list_model_ids(base_url: str, api_key: str) -> tuple[list[str], str | None]:
         ids = sorted(set(raw), key=str.lower)
         return ids, None
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         ms = (time.perf_counter() - t0) * 1000.0
-        _log.info("upstream GET %s timeout after %.1fms", url, ms)
+        _log.info("upstream GET %s timeout after %.1fms: %s", url, ms, e)
         return [], (
-            "Таймаут при запросе списка моделей (проверьте base URL и доступность API). "
-            "Введите имя модели вручную."
+            f"Таймаут при запросе к {url} ({type(e).__name__}: {e}). "
+            "Проверьте base URL провайдера (обычно заканчивается на /v1), сеть и доступность API."
         )
     except httpx.RequestError as e:
         ms = (time.perf_counter() - t0) * 1000.0
         _log.info("upstream GET %s request error after %.1fms: %s", url, ms, e)
-        return [], str(e)
+        return [], f"{type(e).__name__}: {e} (запрос: {url})"
     except Exception as e:  # noqa: BLE001
         ms = (time.perf_counter() - t0) * 1000.0
         _log.info("upstream GET %s error after %.1fms: %s", url, ms, e)
-        return [], str(e)
+        return [], f"{type(e).__name__}: {e} (запрос: {url})"

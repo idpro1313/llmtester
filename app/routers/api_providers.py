@@ -9,7 +9,7 @@ from app.auth import require_admin
 from app.crypto_util import decrypt_secret
 from app.db import get_db
 from app.models import AdminUser, Provider
-from app.services.openai_models import list_model_ids
+from app.services.openai_models import list_model_ids, models_endpoint_url
 
 router = APIRouter(tags=["api"])
 
@@ -34,12 +34,15 @@ def provider_models_list(
             "models": [],
         }
 
+    upstream_url = models_endpoint_url(prov.base_url)
     ids, err = list_model_ids(prov.base_url, api_key)
     if err is not None:
         return {
             "ok": False,
             "error": "upstream",
             "message": err,
+            "upstream_url": upstream_url,
+            "provider_base_url": prov.base_url,
             "models": [],
         }
 
