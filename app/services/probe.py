@@ -3,15 +3,52 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.crypto_util import decrypt_secret
+from app.db import get_session_local
 from app.models import GlobalSettings, Measurement, MonitoredTarget, Provider
 from llm_benchmark.core import run_probe
 
 log = logging.getLogger(__name__)
+
+_manual_probe_lock = threading.Lock()
+_manual_probe_running = False
+
+
+def run_all_enabled_probes_in_background() -> bool:
+    """
+    Запускает те же замеры, что и по кнопке «сейчас», в отдельном потоке.
+    Возвращает False, если предыдущий ручной запуск ещё выполняется.
+    """
+    global _manual_probe_running
+    with _manual_probe_lock:
+        if _manual_probe_running:
+            return False
+        _manual_probe_running = True
+
+    def job() -> None:
+        global _manual_probe_running
+        try:
+            SessionLocal = get_session_local()
+            db = SessionLocal()
+            try:
+                log.info("Ручной запуск замеров в фоне…")
+                n = run_all_enabled_probes(db)
+                log.info("Фоновые замеры завершены, целей с записью в БД: %s", n)
+            finally:
+                db.close()
+        except Exception:
+            log.exception("Фоновый запуск замеров")
+        finally:
+            with _manual_probe_lock:
+                _manual_probe_running = False
+
+    threading.Thread(target=job, name="manual-probes", daemon=True).start()
+    return True
 
 
 def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:

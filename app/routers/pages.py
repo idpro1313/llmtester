@@ -15,7 +15,7 @@ from app.crypto_util import encrypt_secret
 from app.db import get_db
 from app.log_reader import log_file_path, read_requests_log_tail
 from app.models import AdminUser, GlobalSettings, MonitoredTarget, Provider
-from app.services.probe import run_all_enabled_probes
+from app.services.probe import run_all_enabled_probes_in_background
 from app.version_info import get_version
 
 _TPL = Path(__file__).resolve().parent.parent / "templates"
@@ -143,8 +143,7 @@ def dashboard(request: Request, db: Annotated[Session, Depends(get_db)]):
         .order_by(Provider.sort_order, MonitoredTarget.id)
     ).unique().all()
     msg = request.query_params.get("msg", "")
-    n = request.query_params.get("n", "")
-    return _tpl(request, "dashboard.html", user=u, targets=targets, msg=msg, run_n=n)
+    return _tpl(request, "dashboard.html", user=u, targets=targets, msg=msg)
 
 
 @router.get("/admin/providers")
@@ -399,8 +398,9 @@ def admin_run_now(request: Request, db: Annotated[Session, Depends(get_db)]):
     u = _need_user(request, db)
     if isinstance(u, RedirectResponse):
         return u
-    n = run_all_enabled_probes(db)
-    return RedirectResponse(f"/dashboard?msg=run&n={n}", status_code=302)
+    if not run_all_enabled_probes_in_background():
+        return RedirectResponse("/dashboard?msg=run_busy", status_code=302)
+    return RedirectResponse("/dashboard?msg=run_bg", status_code=302)
 
 
 @router.get("/health")

@@ -5,13 +5,14 @@
 {% endblock %}
 {% block content %}
 <h1>Дашборд</h1>
-{% if msg == "run" %}
-<p class="ok">Ручной запуск замеров выполнен. Целей с успешной записью в БД: {{ run_n or "0" }}
-  {% if run_n == "0" %}<span class="muted">(нет активных целей, пустое имя модели или не задан API-ключ у провайдера.)</span>{% endif %}
-</p>
+{% if msg == "run_bg" %}
+<p class="ok">Замеры запущены в фоне. Через некоторое время нажмите «Обновить» на графиках — новые точки появятся после завершения запросов к API.</p>
+{% elif msg == "run_busy" %}
+<p class="muted err">Предыдущий ручной запуск замеров ещё выполняется. Дождитесь окончания или проверьте логи сервера.</p>
 {% endif %}
 <form method="post" action="/admin/run-now" class="inline-form">
   <button type="submit">Запустить замеры сейчас</button>
+  <span class="muted">(в фоне, страница не ждёт ответа API)</span>
 </form>
 
 <section class="controls">
