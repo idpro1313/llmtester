@@ -68,36 +68,25 @@ python benchmark.py --model YOUR_MODEL --base-url https://.../v1 --api-key ...
 - `app/` — FastAPI, шаблоны, планировщик APScheduler.
 - `benchmark.py` — CLI-обёртка.
 
-## Публикация образа в GitLab Container Registry (`gitlabacr.aplanadc.ru`)
+## Отправка проекта в GitLab
 
-В репозитории есть [`.gitlab-ci.yml`](.gitlab-ci.yml): при пуше в **основную ветку** (`main`/`master` — совпадает с **Default branch** в настройках проекта) или при пуше **git-тега** Kaniko собирает образ и пушит в реестр вашего GitLab.
+Git-сервер: **`https://gitlabacr.aplanadc.ru/`**, группа/namespace: **`IYatsishen`**.
 
-1. Создайте проект в GitLab под путём вроде `IYatsishen/<имя-проекта>` (хост Git — обычно отдельный от `gitlabacr`, например корпоративный GitLab).
-2. Убедитесь, что в проекте включён **Container Registry**.
-3. Привяжите remote и отправьте код:
+1. В веб-интерфейсе создайте **пустой проект** (без README) в `IYatsishen`, задайте имя, например `llmtester`.
+2. Скопируйте HTTPS-URL из **Code → Clone** — он будет вида  
+   `https://gitlabacr.aplanadc.ru/IYatsishen/<имя-проекта>.git`
+3. Локально:
 
    ```bash
-   git remote add origin https://<ваш-gitlab>/IYatsishen/<имя-проекта>.git
-   git add .
-   git commit -m "Initial commit: LLM inference monitor"
+   git remote remove origin   # если origin уже указывал куда-то ещё
+   git remote add origin https://gitlabacr.aplanadc.ru/IYatsishen/<имя-проекта>.git
+   git branch -M main
    git push -u origin main
    ```
 
-4. После успешного pipeline образ будет доступен по адресу, который GitLab показывает в **Deploy → Container Registry**, например:
+Для **HTTPS** GitLab обычно нужен **Personal Access Token** вместо пароля при запросе учётных данных.
 
-   `gitlabacr.aplanadc.ru/iyatsishen/<имя-проекта>:latest`
-
-   (регистр пути часто **в нижнем регистре** — смотрите точное имя в UI).
-
-**Ручная публикация** (с машины с Docker), если CI не используете:
-
-```bash
-docker login gitlabacr.aplanadc.ru -u <логин> -p <personal_access_token_или_deploy_token>
-docker build -t gitlabacr.aplanadc.ru/iyatsishen/<имя-проекта>:latest .
-docker push gitlabacr.aplanadc.ru/iyatsishen/<имя-проекта>:latest
-```
-
-Токен нужен с правом `write_registry` (или deploy token с `write_package_registry`).
+CI/CD в репозитории **не используется** (файла `.gitlab-ci.yml` нет).
 
 ## Безопасность
 
