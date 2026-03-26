@@ -1,5 +1,8 @@
+name: llmtester
+
 services:
-  web:
+  llmtester:
+    container_name: llmtester
     build: .
     ports:
       - "4444:8000"

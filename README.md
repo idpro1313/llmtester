@@ -18,7 +18,7 @@
 
 Файл **`.env` не используется**. В каталоге `./data` на хосте хранятся **`monitor.db`**, **`.session_secret`** (подпись cookie) и при необходимости сгенерированный ключ Fernet в БД.
 
-1. Запуск из каталога с `docker-compose.yml`:
+1. Запуск из каталога с `docker-compose.yml`. Имя Compose-проекта, сервиса и контейнера — **`llmtester`**, чтобы не пересекаться с другими стеками.
 
    ```bash
    docker compose up --build
