@@ -4,12 +4,23 @@
 <h1>Лог HTTP-запросов</h1>
 <p class="muted">Источник: <code>{{ log_path }}</code> (ротация при росте файла). Показаны последние строки текущего файла.</p>
 
+{% if log_flash == "cleared" %}
+<p class="ok">Файлы лога очищены (текущий и ротированные <code>requests.log*</code>).</p>
+{% elif log_flash == "clear_err" %}
+<p class="muted err">Не удалось очистить лог (нет прав на файл или диск недоступен). Смотрите логи процесса.</p>
+{% endif %}
+
 <form method="get" class="log-toolbar">
   <label>Строк с конца
     <input type="number" name="lines" value="{{ lines }}" min="50" max="3000" step="50" />
   </label>
   <button type="submit">Показать</button>
   <a class="btn-link" href="{{ request.url.path }}?lines={{ lines }}">Обновить</a>
+</form>
+
+<form method="post" action="/admin/logs/clear" class="log-toolbar log-toolbar-danger" onsubmit="return confirm('Удалить текущий requests.log и все ротированные файлы (requests.log.1 …)? Это необратимо.');">
+  <button type="submit" class="danger">Очистить лог</button>
+  <span class="muted">Удаляет <code>requests.log</code> и ротированные <code>requests.log.1</code> … <code>.5</code></span>
 </form>
 
 {% if log_files %}

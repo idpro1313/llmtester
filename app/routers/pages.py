@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.access_logging import clear_requests_log_files
 from app.auth import has_any_admin, hash_password, login_user, session_admin_user
 from app.crypto_util import encrypt_secret
 from app.db import get_db
@@ -375,6 +376,7 @@ def admin_logs(
         return u
     text, files = read_requests_log_tail(lines)
     path = log_file_path()
+    flash = request.query_params.get("msg", "")
     if not text.strip():
         if path.is_file() and path.stat().st_size == 0:
             text = "(файл пуст)"
@@ -390,7 +392,19 @@ def admin_logs(
         log_files=files,
         lines=lines,
         log_path=str(path.resolve()),
+        log_flash=flash,
     )
+
+
+@router.post("/admin/logs/clear")
+def admin_logs_clear(request: Request, db: Annotated[Session, Depends(get_db)]):
+    u = _need_user(request, db)
+    if isinstance(u, RedirectResponse):
+        return u
+    err = clear_requests_log_files()
+    if err:
+        return RedirectResponse("/admin/logs?msg=clear_err", status_code=302)
+    return RedirectResponse("/admin/logs?msg=cleared", status_code=302)
 
 
 @router.post("/admin/run-now")
