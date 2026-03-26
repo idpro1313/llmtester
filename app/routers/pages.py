@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -15,6 +15,7 @@ from app.crypto_util import encrypt_secret
 from app.db import get_db
 from app.models import AdminUser, GlobalSettings, MonitoredTarget, Provider
 from app.services.probe import run_all_enabled_probes
+from app.version_info import get_version
 
 _TPL = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TPL))
@@ -23,6 +24,11 @@ router = APIRouter()
 
 def _ctx(request: Request, **extra):
     return {"request": request, **extra}
+
+
+def _tpl(request: Request, name: str, *, status_code: int = 200, **ctx: Any):
+    """Starlette: TemplateResponse(request, name, context, status_code=...)."""
+    return templates.TemplateResponse(request, name, _ctx(request, **ctx), status_code=status_code)
 
 
 def _need_user(request: Request, db: Session) -> AdminUser | RedirectResponse:
@@ -47,7 +53,7 @@ def login_page(
     if q == "created":
         msg = "Учётная запись создана. Войдите."
         msg_ok = True
-    return templates.TemplateResponse("login.html", _ctx(request, msg=msg, msg_ok=msg_ok))
+    return _tpl(request, "login.html", msg=msg, msg_ok=msg_ok)
 
 
 @router.post("/login")
@@ -59,9 +65,11 @@ def login_post(
 ):
     user = login_user(db, username.strip(), password)
     if user is None:
-        return templates.TemplateResponse(
+        return _tpl(
+            request,
             "login.html",
-            _ctx(request, msg="Неверный логин или пароль", msg_ok=False),
+            msg="Неверный логин или пароль",
+            msg_ok=False,
             status_code=401,
         )
     request.session["admin_user_id"] = user.id
@@ -84,7 +92,7 @@ def setup_page(
         return RedirectResponse("/dashboard", status_code=302)
     if has_any_admin(db):
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("setup.html", _ctx(request, msg=msg))
+    return _tpl(request, "setup.html", msg=msg)
 
 
 @router.post("/setup")
@@ -99,33 +107,17 @@ def setup_post(
         return RedirectResponse("/login", status_code=302)
     u = username.strip()
     if len(u) < 2:
-        return templates.TemplateResponse(
-            "setup.html",
-            _ctx(request, msg="Логин не короче 2 символов."),
-            status_code=400,
-        )
+        return _tpl(request, "setup.html", msg="Логин не короче 2 символов.", status_code=400)
     if len(password) < 8:
-        return templates.TemplateResponse(
-            "setup.html",
-            _ctx(request, msg="Пароль не короче 8 символов."),
-            status_code=400,
-        )
+        return _tpl(request, "setup.html", msg="Пароль не короче 8 символов.", status_code=400)
     if password != password2:
-        return templates.TemplateResponse(
-            "setup.html",
-            _ctx(request, msg="Пароли не совпадают."),
-            status_code=400,
-        )
+        return _tpl(request, "setup.html", msg="Пароли не совпадают.", status_code=400)
     try:
         db.add(AdminUser(username=u, password_hash=hash_password(password)))
         db.commit()
     except IntegrityError:
         db.rollback()
-        return templates.TemplateResponse(
-            "setup.html",
-            _ctx(request, msg="Такой логин уже занят."),
-            status_code=400,
-        )
+        return _tpl(request, "setup.html", msg="Такой логин уже занят.", status_code=400)
     return RedirectResponse("/login?msg=created", status_code=302)
 
 
@@ -151,10 +143,7 @@ def dashboard(request: Request, db: Annotated[Session, Depends(get_db)]):
     ).unique().all()
     msg = request.query_params.get("msg", "")
     n = request.query_params.get("n", "")
-    return templates.TemplateResponse(
-        "dashboard.html",
-        _ctx(request, user=u, targets=targets, msg=msg, run_n=n),
-    )
+    return _tpl(request, "dashboard.html", user=u, targets=targets, msg=msg, run_n=n)
 
 
 @router.get("/admin/providers")
@@ -168,10 +157,7 @@ def admin_providers(
         return u
     rows = db.scalars(select(Provider).order_by(Provider.sort_order, Provider.id)).all()
     qmsg = request.query_params.get("msg", msg)
-    return templates.TemplateResponse(
-        "providers.html",
-        _ctx(request, user=u, providers=rows, msg=qmsg),
-    )
+    return _tpl(request, "providers.html", user=u, providers=rows, msg=qmsg)
 
 
 @router.get("/admin/providers/{pid}")
@@ -182,10 +168,7 @@ def admin_provider_edit(request: Request, db: Annotated[Session, Depends(get_db)
     p = db.get(Provider, pid)
     if p is None:
         raise HTTPException(404)
-    return templates.TemplateResponse(
-        "provider_edit.html",
-        _ctx(request, user=u, provider=p, msg=""),
-    )
+    return _tpl(request, "provider_edit.html", user=u, provider=p, msg="")
 
 
 @router.post("/admin/providers/{pid}")
@@ -212,11 +195,7 @@ def admin_provider_save(
         try:
             p.api_key_encrypted = encrypt_secret(key)
         except RuntimeError as e:
-            return templates.TemplateResponse(
-                "provider_edit.html",
-                _ctx(request, user=u, provider=p, msg=str(e)),
-                status_code=400,
-            )
+            return _tpl(request, "provider_edit.html", user=u, provider=p, msg=str(e), status_code=400)
     db.commit()
     return RedirectResponse("/admin/providers?msg=saved", status_code=302)
 
@@ -233,10 +212,7 @@ def admin_targets(request: Request, db: Annotated[Session, Depends(get_db)]):
         .order_by(Provider.sort_order, MonitoredTarget.id)
     ).unique().all()
     qmsg = request.query_params.get("msg", "")
-    return templates.TemplateResponse(
-        "targets.html",
-        _ctx(request, user=u, targets=rows, msg=qmsg),
-    )
+    return _tpl(request, "targets.html", user=u, targets=rows, msg=qmsg)
 
 
 @router.get("/admin/targets/new")
@@ -258,10 +234,7 @@ def admin_target_new(request: Request, db: Annotated[Session, Depends(get_db)]):
         warmup_runs=0,
     )
     setattr(t, "_virtual_new", True)
-    return templates.TemplateResponse(
-        "target_edit.html",
-        _ctx(request, user=u, target=t, providers=providers, is_new=True),
-    )
+    return _tpl(request, "target_edit.html", user=u, target=t, providers=providers, is_new=True)
 
 
 @router.get("/admin/targets/{tid}")
@@ -273,10 +246,7 @@ def admin_target_edit(request: Request, db: Annotated[Session, Depends(get_db)],
     if t is None:
         raise HTTPException(404)
     providers = db.scalars(select(Provider).order_by(Provider.sort_order)).all()
-    return templates.TemplateResponse(
-        "target_edit.html",
-        _ctx(request, user=u, target=t, providers=providers, is_new=False),
-    )
+    return _tpl(request, "target_edit.html", user=u, target=t, providers=providers, is_new=False)
 
 
 @router.post("/admin/targets/new")
@@ -365,10 +335,7 @@ def admin_settings(request: Request, db: Annotated[Session, Depends(get_db)]):
         return u
     gs = db.get(GlobalSettings, 1)
     qmsg = request.query_params.get("msg", "")
-    return templates.TemplateResponse(
-        "settings.html",
-        _ctx(request, user=u, settings=gs, msg=qmsg),
-    )
+    return _tpl(request, "settings.html", user=u, settings=gs, msg=qmsg)
 
 
 @router.post("/admin/settings")
@@ -408,4 +375,4 @@ def admin_run_now(request: Request, db: Annotated[Session, Depends(get_db)]):
 
 @router.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": get_version()}
