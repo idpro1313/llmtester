@@ -16,7 +16,7 @@ services:
   web:
     build: .
     ports:
-      - "3333:8000"
+      - "4444:8000"
     environment:
       DATABASE_URL: postgresql://monitor:monitor@db:5432/monitor
       FERNET_KEY: ${FERNET_KEY:?Set FERNET_KEY in .env — см. .env.example}
