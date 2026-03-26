@@ -26,7 +26,7 @@
    docker compose up --build
    ```
 
-4. Откройте http://localhost:8000 — вход: `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+4. Откройте http://localhost:3333 — вход: `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
 
 5. В разделе **Провайдеры** укажите реальные **base URL** из документации API (OpenAI-compatible), вставьте ключ, включите провайдера.
 
