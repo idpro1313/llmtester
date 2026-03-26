@@ -13,6 +13,11 @@ _MAX_BYTES = 5 * 1024 * 1024
 _BACKUP_COUNT = 5
 
 
+def access_http_logger() -> logging.Logger:
+    """Тот же логгер, что и для входящих HTTP — строки попадают в requests.log и stdout."""
+    return logging.getLogger(ACCESS_LOGGER_NAME)
+
+
 def _access_formatter() -> logging.Formatter:
     return logging.Formatter(
         "%(asctime)s | %(message)s",

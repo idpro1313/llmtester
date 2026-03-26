@@ -8,12 +8,14 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.access_logging import access_http_logger
 from app.crypto_util import decrypt_secret
 from app.db import get_session_local
 from app.models import GlobalSettings, Measurement, MonitoredTarget, Provider
 from llm_benchmark.core import run_probe
 
 log = logging.getLogger(__name__)
+_http_access = access_http_logger()
 
 _manual_probe_lock = threading.Lock()
 _manual_probe_running = False
@@ -37,7 +39,7 @@ def run_all_enabled_probes_in_background() -> bool:
             db = SessionLocal()
             try:
                 log.info("Ручной запуск замеров в фоне…")
-                n = run_all_enabled_probes(db)
+                n = run_all_enabled_probes(db, probe_cycle_source="manual")
                 log.info("Фоновые замеры завершены, целей с записью в БД: %s", n)
             finally:
                 db.close()
@@ -54,10 +56,21 @@ def run_all_enabled_probes_in_background() -> bool:
 def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
     prov = target.provider
     if not prov.is_active:
+        _http_access.info(
+            "probe | skip target_id=%s model=%s reason=provider_inactive",
+            target.id,
+            target.model_name,
+        )
         return []
     api_key = decrypt_secret(prov.api_key_encrypted)
     if not api_key.strip():
         log.warning("Провайдер %s без API-ключа, пропуск", prov.slug)
+        _http_access.info(
+            "probe | skip target_id=%s model=%s reason=no_api_key provider=%s",
+            target.id,
+            target.model_name,
+            prov.slug,
+        )
         return []
 
     gs = db.get(GlobalSettings, 1)
@@ -79,6 +92,19 @@ def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
         stream=target.use_stream,
         runs=target.runs_per_probe,
         warmup=warmup,
+    )
+    ok_n = sum(1 for m in metrics_list if m.success)
+    _http_access.info(
+        "probe | target_id=%s model=%s batch=%s provider=%s stream=%s "
+        "runs=%s ok=%s base_url=%s (исходящие вызовы chat к провайдеру в этом цикле)",
+        target.id,
+        target.model_name,
+        batch_id,
+        prov.slug,
+        target.use_stream,
+        len(metrics_list),
+        ok_n,
+        prov.base_url.rstrip("/"),
     )
 
     rows: list[Measurement] = []
@@ -113,7 +139,11 @@ def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
     return rows
 
 
-def run_all_enabled_probes(db: Session) -> int:
+def run_all_enabled_probes(db: Session, *, probe_cycle_source: str = "scheduler") -> int:
+    _http_access.info(
+        "probes | cycle start source=%s (замеры не видны как входящий HTTP — это исходящие запросы к LLM)",
+        probe_cycle_source,
+    )
     targets = (
         db.query(MonitoredTarget)
         .join(Provider)
@@ -123,6 +153,7 @@ def run_all_enabled_probes(db: Session) -> int:
     n = 0
     for t in targets:
         if not t.model_name.strip():
+            _http_access.info("probe | skip target_id=%s reason=empty_model_name", t.id)
             continue
         try:
             rows = run_target_probe(db, t)
@@ -130,4 +161,11 @@ def run_all_enabled_probes(db: Session) -> int:
                 n += 1
         except Exception:
             log.exception("Ошибка замера target_id=%s", t.id)
+            _http_access.info("probe | error target_id=%s see app log", t.id)
+    _http_access.info(
+        "probes | cycle end source=%s targets_with_saved_rows=%s candidates=%s",
+        probe_cycle_source,
+        n,
+        len(targets),
+    )
     return n

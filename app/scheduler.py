@@ -6,11 +6,13 @@ from typing import Any, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 
+from app.access_logging import access_http_logger
 from app.db import get_session_local
 from app.models import GlobalSettings
 from app.services.probe import run_all_enabled_probes
 
 log = logging.getLogger(__name__)
+_http_access = access_http_logger()
 
 JOB_ID = "inference_probes"
 _scheduler: Optional[BackgroundScheduler] = None
@@ -19,14 +21,16 @@ _probes_job_paused: bool = False
 
 
 def _tick() -> None:
+    _http_access.info("scheduler | interval tick fired (APScheduler → цикл замеров)")
     SessionLocal = get_session_local()
     db = SessionLocal()
     try:
-        n = run_all_enabled_probes(db)
+        n = run_all_enabled_probes(db, probe_cycle_source="scheduler")
         if n:
             log.info("Завершён цикл замеров, активных целей: %s", n)
     except Exception:
         log.exception("Ошибка планировщика замеров")
+        _http_access.info("scheduler | tick failed see app log")
     finally:
         db.close()
 
@@ -54,12 +58,17 @@ def start_scheduler_from_db() -> None:
         interval = get_interval_seconds(db)
     finally:
         db.close()
+    thread_was_running = sch.running
     if sch.get_job(JOB_ID):
         sch.remove_job(JOB_ID)
     sch.add_job(_tick, "interval", seconds=interval, id=JOB_ID, replace_existing=True)
     if not sch.running:
         sch.start()
     log.info("Планировщик: интервал %s с", interval)
+    if thread_was_running:
+        _http_access.info("scheduler | job updated interval=%s s", interval)
+    else:
+        _http_access.info("scheduler | thread started interval=%s s", interval)
 
 
 def _pause_job_if_present(sch: BackgroundScheduler) -> None:
@@ -92,6 +101,7 @@ def reschedule_from_db() -> None:
     if was_paused:
         _pause_job_if_present(sch)
     log.info("Планировщик перенастроен: интервал %s с", interval)
+    _http_access.info("scheduler | interval rescheduled to %s s (настройки)", interval)
 
 
 def shutdown_scheduler() -> None:
@@ -109,6 +119,7 @@ def pause_scheduled_probes() -> None:
         _pause_job_if_present(sch)
     _probes_job_paused = True
     log.info("Автозамеры приостановлены (пауза)")
+    _http_access.info("scheduler | auto probes PAUSED (кнопка Стоп / API)")
 
 
 def resume_scheduled_probes() -> None:
@@ -119,18 +130,22 @@ def resume_scheduled_probes() -> None:
     if not sch.running:
         start_scheduler_from_db()
         log.info("Планировщик запущен, автозамеры активны")
+        _http_access.info("scheduler | STARTED (поток + задача, кнопка Старт / API)")
         return
     job = sch.get_job(JOB_ID)
     if job:
         try:
             sch.resume_job(JOB_ID)
             log.info("Автозамеры возобновлены (resume)")
+            _http_access.info("scheduler | auto probes RESUMED (кнопка Старт / API)")
         except Exception:
             log.exception("resume_job")
             start_scheduler_from_db()
+            _http_access.info("scheduler | RESUMED after recreate job")
     else:
         start_scheduler_from_db()
         log.info("Планировщик: задача пересоздана, автозамеры активны")
+        _http_access.info("scheduler | job recreated, auto probes active")
 
 
 def scheduler_status_dict(db: Session) -> dict[str, Any]:
