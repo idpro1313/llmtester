@@ -9,11 +9,21 @@
 <p class="ok">Замеры запущены в фоне. Через некоторое время нажмите «Обновить» на графиках — новые точки появятся после завершения запросов к API.</p>
 {% elif msg == "run_busy" %}
 <p class="muted err">Предыдущий ручной запуск замеров ещё выполняется. Дождитесь окончания или проверьте логи сервера.</p>
+{% elif msg == "metrics_cleared" %}
+<p class="ok">{% if metrics_cleared_n is not none %}Удалено записей замеров: {{ metrics_cleared_n }}. {% else %}Все сохранённые замеры удалены из базы. {% endif %}Нажмите «Обновить» у графиков — данные подтянутся заново.</p>
+{% elif msg == "metrics_clear_err" %}
+<p class="muted err">Не удалось очистить данные замеров. Смотрите лог сервера приложения.</p>
 {% endif %}
+<div class="dashboard-toolbar">
 <form method="post" action="/admin/run-now" class="inline-form">
   <button type="submit">Запустить замеры сейчас</button>
   <span class="muted">(в фоне, страница не ждёт ответа API)</span>
 </form>
+<form method="post" action="/admin/measurements/clear" class="inline-form" onsubmit="return confirm('Удалить все сохранённые замеры из базы? Провайдеры и цели не затрагиваются. Действие необратимо.');">
+  <button type="submit" class="danger">Очистить данные замеров</button>
+  <span class="muted">все строки метрик в БД</span>
+</form>
+</div>
 
 <section class="scheduler-bar" aria-label="Планировщик замеров">
   <div class="scheduler-bar-inner">

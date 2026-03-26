@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -15,13 +16,14 @@ from app.auth import has_any_admin, hash_password, login_user, session_admin_use
 from app.crypto_util import encrypt_secret
 from app.db import get_db
 from app.log_reader import log_file_path, read_requests_log_tail
-from app.models import AdminUser, GlobalSettings, MonitoredTarget, Provider
+from app.models import AdminUser, GlobalSettings, Measurement, MonitoredTarget, Provider
 from app.services.probe import run_all_enabled_probes_in_background
 from app.version_info import get_version
 
 _TPL = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TPL))
 router = APIRouter()
+_log = logging.getLogger(__name__)
 
 
 def _ctx(request: Request, **extra):
@@ -144,7 +146,16 @@ def dashboard(request: Request, db: Annotated[Session, Depends(get_db)]):
         .order_by(Provider.sort_order, MonitoredTarget.id)
     ).unique().all()
     msg = request.query_params.get("msg", "")
-    return _tpl(request, "dashboard.html", user=u, targets=targets, msg=msg)
+    n_raw = request.query_params.get("n")
+    metrics_cleared_n: int | None = int(n_raw) if n_raw is not None and n_raw.isdigit() else None
+    return _tpl(
+        request,
+        "dashboard.html",
+        user=u,
+        targets=targets,
+        msg=msg,
+        metrics_cleared_n=metrics_cleared_n,
+    )
 
 
 @router.get("/admin/providers")
@@ -405,6 +416,24 @@ def admin_logs_clear(request: Request, db: Annotated[Session, Depends(get_db)]):
     if err:
         return RedirectResponse("/admin/logs?msg=clear_err", status_code=302)
     return RedirectResponse("/admin/logs?msg=cleared", status_code=302)
+
+
+@router.post("/admin/measurements/clear")
+def admin_measurements_clear(request: Request, db: Annotated[Session, Depends(get_db)]):
+    u = _need_user(request, db)
+    if isinstance(u, RedirectResponse):
+        return u
+    try:
+        r = db.execute(delete(Measurement))
+        db.commit()
+        rc = r.rowcount
+        if rc is not None and rc >= 0:
+            return RedirectResponse(f"/dashboard?msg=metrics_cleared&n={rc}", status_code=302)
+        return RedirectResponse("/dashboard?msg=metrics_cleared", status_code=302)
+    except Exception:
+        db.rollback()
+        _log.exception("Очистка таблицы measurements")
+        return RedirectResponse("/dashboard?msg=metrics_clear_err", status_code=302)
 
 
 @router.post("/admin/run-now")
