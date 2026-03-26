@@ -131,16 +131,32 @@ button.link.danger { color: var(--err); }
 
 .charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
   margin: 1rem 0 2rem;
 }
 .chart-box {
-  height: 260px;
+  width: 100%;
+  min-height: 360px;
+  height: clamp(360px, 48vh, 640px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.5rem;
+  padding: 0.65rem 0.75rem 0.5rem;
+  position: relative;
+}
+.chart-box canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+@media (min-width: 1400px) {
+  .charts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .chart-box:nth-child(3) {
+    grid-column: 1 / -1;
+  }
 }
 
 .login-body {

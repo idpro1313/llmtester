@@ -91,22 +91,70 @@
       borderColor: colors[i++ % colors.length],
       backgroundColor: 'transparent',
       tension: 0.15,
-      pointRadius: 2,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      borderWidth: 2,
     }));
   }
 
   function chartOpts(title) {
+    const timeTick = (v) =>
+      new Date(v).toLocaleString(undefined, {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
     return {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { title: { display: true, text: title } },
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        title: {
+          display: true,
+          text: title,
+          padding: { top: 4, bottom: 10 },
+          font: { size: 15, weight: '600' },
+        },
+        legend: {
+          position: 'bottom',
+          align: 'start',
+          labels: {
+            boxWidth: 14,
+            boxHeight: 8,
+            padding: 10,
+            font: { size: 11 },
+            usePointStyle: true,
+            pointStyle: 'line',
+          },
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const x = items[0] && items[0].parsed.x;
+              return x != null ? new Date(x).toLocaleString() : '';
+            },
+          },
+        },
+      },
+      layout: { padding: { left: 4, right: 8, bottom: 4, top: 2 } },
       scales: {
         x: {
           type: 'linear',
-          title: { display: true, text: 'Время' },
-          ticks: { callback: (v) => new Date(v).toLocaleString() },
+          title: { display: true, text: 'Время', padding: { top: 4 } },
+          ticks: {
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+            callback: (v) => timeTick(v),
+          },
         },
-        y: { beginAtZero: true },
+        y: {
+          beginAtZero: true,
+          grace: '12%',
+          ticks: { maxTicksLimit: 8 },
+        },
       },
     };
   }
