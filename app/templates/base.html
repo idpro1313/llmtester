@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}LLM Monitor{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% if user is defined %}
+  <header class="top">
+    <nav class="nav">
+      <a href="/dashboard">Дашборд</a>
+      <a href="/admin/providers">Провайдеры</a>
+      <a href="/admin/targets">Модели</a>
+      <a href="/admin/settings">Настройки</a>
+      <span class="spacer"></span>
+      <span class="muted">{{ user.username }}</span>
+      <a href="/logout">Выход</a>
+    </nav>
+  </header>
+  {% endif %}
+  <main class="main">{% block content %}{% endblock %}</main>
+</body>
+</html>

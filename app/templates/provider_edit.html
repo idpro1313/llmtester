@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Провайдер {{ provider.slug }}{% endblock %}
+{% block content %}
+<h1>{{ provider.display_name }}</h1>
+<p class="muted">Код: <code>{{ provider.slug }}</code> (не меняется)</p>
+{% if msg %}
+<p class="error">{{ msg }}</p>
+{% endif %}
+<form method="post" class="stack narrow">
+  <label>Отображаемое имя <input name="display_name" value="{{ provider.display_name }}" required /></label>
+  <label>Base URL (OpenAI-compatible, с /v1 при необходимости)
+    <input name="base_url" value="{{ provider.base_url }}" required placeholder="https://..." />
+  </label>
+  <label>API-ключ
+    <input type="password" name="api_key" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять" />
+  </label>
+  <input type="hidden" name="is_active" value="0" />
+  <label class="check"><input type="checkbox" name="is_active" value="1" {% if provider.is_active %}checked{% endif %} /> Провайдер активен</label>
+  <button type="submit">Сохранить</button>
+  <a href="/admin/providers">← Назад</a>
+</form>
+{% endblock %}

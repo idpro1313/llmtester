@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<h1>Глобальные настройки замеров</h1>
+{% if msg == "saved" %}
+<p class="ok">Сохранено. Интервал планировщика обновлён.</p>
+{% endif %}
+<form method="post" class="stack">
+  <label>Интервал автоматических замеров (секунд, не меньше 30)
+    <input type="number" name="probe_interval_seconds" value="{{ settings.probe_interval_seconds }}" min="30" max="86400" required />
+  </label>
+  <label>Прогрев по умолчанию (если у цели 0 — используется это значение)
+    <input type="number" name="default_warmup" value="{{ settings.default_warmup }}" min="0" max="20" />
+  </label>
+  <label>Таймаут HTTP (сек)
+    <input type="number" name="default_timeout" value="{{ settings.default_timeout }}" min="5" max="600" step="1" />
+  </label>
+  <label>Текст промпта для всех замеров
+    <textarea name="benchmark_prompt" rows="8" required>{{ settings.benchmark_prompt }}</textarea>
+  </label>
+  <button type="submit">Сохранить</button>
+</form>
+<p class="muted">Учётные данные провайдеров задаются в разделе «Провайдеры». Ключи хранятся в БД в зашифрованном виде (нужен FERNET_KEY в окружении).</p>
+{% endblock %}

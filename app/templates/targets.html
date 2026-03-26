@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Модели для мониторинга{% endblock %}
+{% block content %}
+<h1>Модели для мониторинга</h1>
+{% if msg == "saved" %}<p class="ok">Сохранено.</p>{% endif %}
+{% if msg == "created" %}<p class="ok">Цель добавлена.</p>{% endif %}
+{% if msg == "deleted" %}<p class="ok">Удалено.</p>{% endif %}
+<p><a class="btn-link" href="/admin/targets/new">+ Добавить модель</a></p>
+<table class="data">
+  <thead>
+    <tr>
+      <th>Провайдер</th><th>Модель</th><th>Вкл.</th><th>Стрим</th><th>Замеров</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in targets %}
+    <tr>
+      <td>{{ t.provider.display_name }}</td>
+      <td><code>{{ t.model_name }}</code></td>
+      <td>{% if t.enabled %}да{% else %}нет{% endif %}</td>
+      <td>{% if t.use_stream %}да{% else %}нет{% endif %}</td>
+      <td>{{ t.runs_per_probe }}</td>
+      <td>
+        <a href="/admin/targets/{{ t.id }}">Изменить</a>
+        <form method="post" action="/admin/targets/{{ t.id }}/delete" class="inline" onsubmit="return confirm('Удалить цель?');">
+          <button type="submit" class="link danger">Удалить</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">Нет целей. Добавьте модель и включите провайдера.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

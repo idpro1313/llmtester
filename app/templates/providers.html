@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Провайдеры{% endblock %}
+{% block content %}
+<h1>Провайдеры API</h1>
+{% if msg == "saved" %}
+<p class="ok">Сохранено.</p>
+{% elif msg == "add_provider_first" %}
+<p class="error">Сначала настройте хотя бы одного провайдера.</p>
+{% endif %}
+<p class="muted">Cloud.ru, Yandex Cloud и MWS — предзаполнены как шаблоны. Укажите реальные base URL и ключи из документации провайдера (OpenAI-compatible).</p>
+<table class="data">
+  <thead>
+    <tr><th>Код</th><th>Название</th><th>Base URL</th><th>Активен</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for p in providers %}
+    <tr>
+      <td><code>{{ p.slug }}</code></td>
+      <td>{{ p.display_name }}</td>
+      <td class="ellipsis" title="{{ p.base_url }}">{{ p.base_url }}</td>
+      <td>{% if p.is_active %}да{% else %}нет{% endif %}</td>
+      <td><a href="/admin/providers/{{ p.id }}">Изменить</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{% if is_new %}Новая модель{% else %}Редактирование{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if is_new %}Новая цель мониторинга{% else %}Редактирование цели{% endif %}</h1>
+<form method="post" action="{% if is_new %}/admin/targets/new{% else %}/admin/targets/{{ target.id }}{% endif %}" class="stack narrow">
+  <label>Провайдер
+    <select name="provider_id" required>
+      {% for p in providers %}
+      <option value="{{ p.id }}" {% if p.id == target.provider_id %}selected{% endif %}>{{ p.display_name }} ({{ p.slug }})</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Имя модели в API <input name="model_name" value="{{ target.model_name }}" required placeholder="gpt-4o-mini" /></label>
+  <label>max_tokens <input type="number" name="max_tokens" value="{{ target.max_tokens }}" min="1" max="128000" /></label>
+  <label>temperature <input type="number" name="temperature" step="0.1" value="{{ target.temperature }}" /></label>
+  <label>Замеров за один цикл <input type="number" name="runs_per_probe" value="{{ target.runs_per_probe }}" min="1" max="20" /></label>
+  <label>Прогрев (запросов до замера, не в БД) <input type="number" name="warmup_runs" value="{{ target.warmup_runs }}" min="0" max="10" /></label>
+  <input type="hidden" name="enabled" value="0" />
+  <label class="check"><input type="checkbox" name="enabled" value="1" {% if target.enabled %}checked{% endif %} /> Мониторинг включён</label>
+  <input type="hidden" name="use_stream" value="0" />
+  <label class="check"><input type="checkbox" name="use_stream" value="1" {% if target.use_stream %}checked{% endif %} /> Стриминг (TTFT, чанки)</label>
+  <button type="submit">Сохранить</button>
+  <a href="/admin/targets">← Назад</a>
+</form>
+{% endblock %}

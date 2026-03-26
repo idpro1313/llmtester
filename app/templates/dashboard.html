@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — LLM Monitor{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Дашборд</h1>
+{% if msg == "run" %}
+<p class="ok">Ручной запуск замеров выполнен. Целей с успешной записью в БД: {{ run_n or "0" }}
+  {% if run_n == "0" %}<span class="muted">(нет активных целей, пустое имя модели или не задан API-ключ у провайдера.)</span>{% endif %}
+</p>
+{% endif %}
+<form method="post" action="/admin/run-now" class="inline-form">
+  <button type="submit">Запустить замеры сейчас</button>
+</form>
+
+<section class="controls">
+  <label>Окно (часы) <input type="number" id="hours" value="24" min="1" max="168" /></label>
+  <label>Цель
+    <select id="targetFilter">
+      <option value="">Все</option>
+    </select>
+  </label>
+  <button type="button" id="refreshBtn">Обновить</button>
+</section>
+
+<section class="charts">
+  <div class="chart-box"><canvas id="chartTtft"></canvas></div>
+  <div class="chart-box"><canvas id="chartTotal"></canvas></div>
+  <div class="chart-box"><canvas id="chartTps"></canvas></div>
+</section>
+
+<h2>Сводка (перцентили по успешным замерам)</h2>
+<div class="table-wrap">
+  <table class="data" id="summaryTable">
+    <thead>
+      <tr>
+        <th>Цель</th>
+        <th>N</th>
+        <th>Ошибки %</th>
+        <th>TTFT p50 / p95</th>
+        <th>Total p50 / p95</th>
+        <th>e2e tok/s p50 / p95</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+{% if targets %}
+<p class="muted">Зарегистрировано целей: {{ targets|length }}. Включите провайдера, задайте API-ключ и добавьте модель в разделе «Модели».</p>
+{% endif %}
+<script>
+(async function () {
+  const colors = ['#5b8def', '#3ecf8e', '#f0b429', '#e85d75', '#a78bfa', '#22d3ee'];
+  let charts = [];
+
+  function destroyCharts() {
+    charts.forEach(c => c.destroy());
+    charts = [];
+  }
+
+  async function loadTargets() {
+    const r = await fetch('/api/targets/options', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const sel = document.getElementById('targetFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Все</option>';
+    d.targets.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = t.label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function mapPoints(points, key) {
+    const byLabel = {};
+    points.forEach(p => {
+      if (!p.success || p[key] == null) return;
+      if (!byLabel[p.label]) byLabel[p.label] = [];
+      byLabel[p.label].push({ x: Date.parse(p.t), y: p[key] });
+    });
+    let i = 0;
+    return Object.entries(byLabel).map(([label, data]) => ({
+      label,
+      data: data.sort((a,b) => a.x - b.x),
+      borderColor: colors[i++ % colors.length],
+      backgroundColor: 'transparent',
+      tension: 0.15,
+      pointRadius: 2,
+    }));
+  }
+
+  function chartOpts(title) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { title: { display: true, text: title } },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Время' },
+          ticks: { callback: (v) => new Date(v).toLocaleString() },
+        },
+        y: { beginAtZero: true },
+      },
+    };
+  }
+
+  function fmtPair(obj, dec) {
+    if (!obj || obj.p50 == null) return '—';
+    const a = obj.p50.toFixed(dec);
+    const b = obj.p95 != null ? obj.p95.toFixed(dec) : '—';
+    return a + ' / ' + b;
+  }
+
+  async function refresh() {
+    const hours = document.getElementById('hours').value || 24;
+    const tid = document.getElementById('targetFilter').value;
+    let url = '/api/metrics/series?hours=' + hours;
+    if (tid) url += '&target_id=' + tid;
+    const rs = await fetch(url, { credentials: 'same-origin' });
+    const ru = await fetch('/api/metrics/summary?hours=' + hours, { credentials: 'same-origin' });
+    if (!rs.ok || !ru.ok) {
+      alert('Не удалось загрузить метрики (войдите заново, если сессия истекла).');
+      return;
+    }
+    const series = await rs.json();
+    const summary = await ru.json();
+
+    destroyCharts();
+    const pts = series.points;
+    charts.push(new Chart(document.getElementById('chartTtft'), {
+      type: 'line',
+      data: { datasets: mapPoints(pts, 'ttft_s') },
+      options: chartOpts('TTFT (с)'),
+    }));
+    charts.push(new Chart(document.getElementById('chartTotal'), {
+      type: 'line',
+      data: { datasets: mapPoints(pts, 'total_s') },
+      options: chartOpts('Полное время (с)'),
+    }));
+    charts.push(new Chart(document.getElementById('chartTps'), {
+      type: 'line',
+      data: { datasets: mapPoints(pts, 'e2e_tps') },
+      options: chartOpts('Токены/с (e2e)'),
+    }));
+
+    const tb = document.querySelector('#summaryTable tbody');
+    tb.innerHTML = '';
+    summary.targets.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + t.label + '</td><td>' + t.samples + '</td><td>' + (100*t.error_rate).toFixed(1) + '</td>' +
+        '<td>' + fmtPair(t.ttft_s, 3) + '</td>' +
+        '<td>' + fmtPair(t.total_s, 3) + '</td>' +
+        '<td>' + fmtPair(t.e2e_tps, 1) + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('hours').addEventListener('change', refresh);
+  document.getElementById('targetFilter').addEventListener('change', refresh);
+  await loadTargets();
+  await refresh();
+})();
+</script>
+{% endblock %}
