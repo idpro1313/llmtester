@@ -208,6 +208,11 @@ def run_all_enabled_probes(db: Session, *, probe_cycle_source: str = "scheduler"
         return 0
 
     workers = min(cap, len(ids))
+    _http_access.info(
+        "probes | parallel pool targets=%s workers=%s (на цель — один поток; внутри цели warmup+runs идут по очереди)",
+        len(ids),
+        workers,
+    )
     n = 0
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="probe") as pool:
         futures = [pool.submit(_probe_target_by_id, tid) for tid in ids]
