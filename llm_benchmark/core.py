@@ -10,8 +10,6 @@ from typing import Any, Optional
 
 from openai import APIError, OpenAI
 
-from llm_benchmark.provider_headers import x_api_key_headers
-
 DEFAULT_PROMPT = (
     "Кратко перечисли 5 причин, почему измеряют latency и throughput LLM в продакшене. "
     "Ответ структурируй маркированным списком, каждый пункт 1–2 предложения."
@@ -289,9 +287,8 @@ def run_probe(
     Ошибки API превращаются в RunMetrics с success=False (цикл не прерывается).
     """
     client = OpenAI(
-        base_url=base_url.rstrip("/"),
         api_key=api_key,
-        default_headers=x_api_key_headers(api_key),
+        base_url=base_url.rstrip("/"),
     )
     include_usage = True
     batch_id = str(uuid.uuid4())

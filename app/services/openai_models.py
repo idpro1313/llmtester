@@ -1,93 +1,74 @@
-"""Список моделей через OpenAI-compatible GET /v1/models (исходящий HTTP + запись в access-лог)."""
+"""Список моделей через OpenAI-compatible API (как в документации Cloud.ru: OpenAI client + base_url)."""
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 
 import httpx
+from openai import APIError, OpenAI
 
 from app.access_logging import ACCESS_LOGGER_NAME
-from app.middleware.body_log import body_bytes_to_log_line
-from llm_benchmark.provider_headers import x_api_key_headers
 
 _log = logging.getLogger(ACCESS_LOGGER_NAME)
 
+# Согласовано с прежними лимитами httpx: UI не «висит» на немом API.
+_OPENAI_TIMEOUT = httpx.Timeout(connect=8.0, read=22.0, write=10.0, pool=5.0)
+
 
 def models_endpoint_url(base_url: str) -> str:
-    """Полный URL запроса списка моделей (base_url из настроек провайдера + /models)."""
+    """Полный URL эндпоинта списка моделей (для сообщений об ошибках и UI)."""
     return f"{base_url.rstrip('/')}/models"
-
-
-def _message_from_error_body(body: bytes, status: int) -> str:
-    if not body:
-        return f"HTTP {status}"
-    try:
-        j = json.loads(body.decode("utf-8"))
-        if isinstance(j, dict):
-            err = j.get("error")
-            if isinstance(err, dict) and err.get("message"):
-                return str(err["message"])
-            if isinstance(err, str):
-                return err
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        pass
-    return body[:800].decode("utf-8", errors="replace") or f"HTTP {status}"
 
 
 def list_model_ids(base_url: str, api_key: str) -> tuple[list[str], str | None]:
     """
     Возвращает (отсортированные уникальные id моделей, None) или ([], сообщение_об_ошибке).
-    Исходящий запрос пишется в тот же лог, что и входящие HTTP (requests.log).
+    Вызов идёт через официальный клиент OpenAI (как у Cloud.ru), без дополнительных заголовков.
     """
+    base = base_url.rstrip("/")
     url = models_endpoint_url(base_url)
-    timeout = httpx.Timeout(connect=8.0, read=22.0, write=10.0, pool=5.0)
     t0 = time.perf_counter()
-    _log.info("upstream begin GET %s (таймауты httpx: connect=8s read=22s)", url)
+    _log.info(
+        "upstream begin OpenAI.models.list base_url=%s (клиент как в документации провайдера)",
+        base,
+    )
     try:
-        with httpx.Client(timeout=timeout) as client:
-            h = {
-                "Authorization": f"Bearer {api_key.strip()}",
-                "Accept": "application/json",
-            }
-            h.update(x_api_key_headers(api_key))
-            r = client.get(url, headers=h)
+        client = OpenAI(
+            api_key=api_key.strip(),
+            base_url=base,
+            timeout=_OPENAI_TIMEOUT,
+            max_retries=0,
+        )
+        resp = client.models.list()
         ms = (time.perf_counter() - t0) * 1000.0
-        ct = r.headers.get("content-type")
-        body = r.content
-        _log.info("upstream GET %s %s %.1fms", url, r.status_code, ms)
-        _log.info("  upstream_req: [Authorization: Bearer ***, X-API-KEY: ***]")
-        _log.info("  upstream_resp: %s", body_bytes_to_log_line(body, ct))
-
-        if r.status_code >= 400:
-            detail = _message_from_error_body(body, r.status_code)
-            return [], f"{detail} (запрос: {url})"
-
-        try:
-            data = r.json()
-        except json.JSONDecodeError as e:
-            return [], f"Некорректный JSON в ответе от {url}: {e}"
-
-        raw: list[str] = []
-        for item in data.get("data") or []:
-            if isinstance(item, dict) and item.get("id"):
-                raw.append(str(item["id"]))
+        raw = [m.id for m in resp.data if getattr(m, "id", None)]
         ids = sorted(set(raw), key=str.lower)
+        _log.info(
+            "upstream models.list ok %.1fms endpoint=%s count=%d",
+            ms,
+            url,
+            len(ids),
+        )
         return ids, None
-
+    except APIError as e:
+        ms = (time.perf_counter() - t0) * 1000.0
+        _log.info("upstream models.list APIError after %.1fms: %s", ms, e)
+        body = getattr(e, "body", None)
+        msg = str(body) if body else str(e)
+        return [], f"{msg} (эндпоинт: {url})"
     except httpx.TimeoutException as e:
         ms = (time.perf_counter() - t0) * 1000.0
-        _log.info("upstream GET %s timeout after %.1fms: %s", url, ms, e)
+        _log.info("upstream models.list timeout after %.1fms: %s", ms, e)
         return [], (
             f"Таймаут при запросе к {url} ({type(e).__name__}: {e}). "
-            "Проверьте base URL провайдера (обычно заканчивается на /v1), сеть и доступность API."
+            "Проверьте base URL (например https://foundation-models.api.cloud.ru/v1), сеть и доступность API."
         )
     except httpx.RequestError as e:
         ms = (time.perf_counter() - t0) * 1000.0
-        _log.info("upstream GET %s request error after %.1fms: %s", url, ms, e)
-        return [], f"{type(e).__name__}: {e} (запрос: {url})"
+        _log.info("upstream models.list request error after %.1fms: %s", ms, e)
+        return [], f"{type(e).__name__}: {e} (эндпоинт: {url})"
     except Exception as e:  # noqa: BLE001
         ms = (time.perf_counter() - t0) * 1000.0
-        _log.info("upstream GET %s error after %.1fms: %s", url, ms, e)
-        return [], f"{type(e).__name__}: {e} (запрос: {url})"
+        _log.info("upstream models.list error after %.1fms: %s", ms, e)
+        return [], f"{type(e).__name__}: {e} (эндпоинт: {url})"

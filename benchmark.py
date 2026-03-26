@@ -18,8 +18,6 @@ from typing import Any, Optional
 
 from openai import OpenAI
 
-from llm_benchmark.provider_headers import x_api_key_headers
-
 from llm_benchmark.core import (
     DEFAULT_PROMPT,
     RunMetrics,
@@ -229,9 +227,8 @@ def main(argv: list[str]) -> None:
     prompt, prompt_source = load_prompt(args.prompt, prompt_path)
 
     client = OpenAI(
-        base_url=args.base_url.rstrip("/"),
         api_key=args.api_key,
-        default_headers=x_api_key_headers(args.api_key),
+        base_url=args.base_url.rstrip("/"),
     )
 
     stream_include_usage = True
