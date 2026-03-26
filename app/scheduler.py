@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 
 from app.access_logging import access_http_logger
+from app.datetime_util import iso_utc_z
 from app.db import get_session_local
 from app.models import GlobalSettings
 from app.services.probe import run_all_enabled_probes
@@ -178,7 +179,7 @@ def scheduler_status_dict(db: Session) -> dict[str, Any]:
     job = sch.get_job(JOB_ID) if sched_running else None
     next_iso: str | None = None
     if job is not None and job.next_run_time is not None:
-        next_iso = job.next_run_time.isoformat()
+        next_iso = iso_utc_z(job.next_run_time)
     active = bool(sched_running and job is not None and not _probes_job_paused)
     return {
         "scheduler_running": sched_running,

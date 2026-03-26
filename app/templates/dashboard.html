@@ -121,9 +121,19 @@
     minute: '2-digit',
     second: '2-digit',
   };
+  /** Naive ISO из SQLite без Z/+offset браузер считает локальным временем — принудительно UTC. */
+  function toUtcMs(t) {
+    if (t == null || t === '') return NaN;
+    if (typeof t === 'number') return t;
+    const s = String(t).trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) return Date.parse(s + 'Z');
+    return Date.parse(s);
+  }
   function formatDisplayTime(v) {
-    if (v == null) return '';
-    return new Date(v).toLocaleString('ru-RU', chartTimeOpts);
+    if (v == null || v === '') return '';
+    const ms = typeof v === 'number' ? v : toUtcMs(v);
+    if (Number.isNaN(ms)) return '';
+    return new Date(ms).toLocaleString('ru-RU', chartTimeOpts);
   }
 
   const colors = ['#5b8def', '#3ecf8e', '#f0b429', '#e85d75', '#a78bfa', '#22d3ee'];
@@ -155,7 +165,7 @@
     points.forEach(p => {
       if (!p.success || p[key] == null) return;
       if (!byLabel[p.label]) byLabel[p.label] = [];
-      byLabel[p.label].push({ x: Date.parse(p.t), y: p[key] });
+      byLabel[p.label].push({ x: toUtcMs(p.t), y: p[key] });
     });
     let i = 0;
     return Object.entries(byLabel).map(([label, data]) => ({
@@ -319,7 +329,7 @@
         return !p.success;
       })
       .sort(function (a, b) {
-        return Date.parse(b.t) - Date.parse(a.t);
+        return toUtcMs(b.t) - toUtcMs(a.t);
       })
       .slice(0, 50);
     if (fails.length === 0) {

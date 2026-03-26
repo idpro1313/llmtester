@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import require_admin
+from app.datetime_util import iso_utc_z
 from app.db import get_db
 from app.models import AdminUser, Measurement, MonitoredTarget, Provider
 
@@ -50,7 +51,7 @@ def metrics_series(
         label = f"{p.display_name} / {t.model_name}"
         points.append(
             {
-                "t": m.created_at.isoformat(),
+                "t": iso_utc_z(m.created_at),
                 "measurement_id": m.id,
                 "target_id": t.id,
                 "batch_id": m.batch_id,
@@ -159,7 +160,7 @@ def metrics_summary(
         )
 
     summaries.sort(key=lambda x: (x["provider_slug"], x["label"]))
-    return {"since": since.isoformat(), "targets": summaries}
+    return {"since": iso_utc_z(since), "targets": summaries}
 
 
 @router.get("/targets/options")
