@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import statistics
 import time
 import uuid
@@ -9,6 +11,30 @@ from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 from openai import APIError, OpenAI
+
+# Тот же логгер, что входящие запросы (requests.log); без хендлеров — сообщения игнорируются.
+_UPSTREAM_ACCESS = logging.getLogger("app.http_access")
+
+
+def _log_chat_completions_body(
+    *,
+    batch_id: str,
+    base_url: str,
+    tag: str,
+    request_kwargs: dict[str, Any],
+) -> None:
+    """Пишет в access-лог JSON тела запроса к chat/completions (без API-ключа — он только в заголовках)."""
+    try:
+        body = json.dumps(request_kwargs, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        body = repr(request_kwargs)
+    _UPSTREAM_ACCESS.info(
+        "upstream chat.completions batch=%s tag=%s base_url=%s body=%s",
+        batch_id,
+        tag,
+        base_url,
+        body,
+    )
 
 DEFAULT_PROMPT = (
     "Кратко перечисли 5 причин, почему измеряют latency и throughput LLM в продакшене. "
@@ -94,6 +120,9 @@ def run_once_stream(
     temperature: float,
     timeout: float,
     include_usage: bool,
+    *,
+    probe_batch_id: str | None = None,
+    probe_tag: str = "stream",
 ) -> RunMetrics:
     kwargs: dict[str, Any] = {
         "model": model,
@@ -105,6 +134,14 @@ def run_once_stream(
     }
     if include_usage:
         kwargs["stream_options"] = {"include_usage": True}
+
+    if probe_batch_id:
+        _log_chat_completions_body(
+            batch_id=probe_batch_id,
+            base_url=str(client.base_url).rstrip("/"),
+            tag=probe_tag,
+            request_kwargs=kwargs,
+        )
 
     stream = client.chat.completions.create(**kwargs)
     t0 = time.perf_counter()
@@ -181,16 +218,27 @@ def run_once_blocking(
     max_tokens: int,
     temperature: float,
     timeout: float,
+    *,
+    probe_batch_id: str | None = None,
+    probe_tag: str = "blocking",
 ) -> RunMetrics:
+    req: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "timeout": timeout,
+        "stream": False,
+    }
+    if probe_batch_id:
+        _log_chat_completions_body(
+            batch_id=probe_batch_id,
+            base_url=str(client.base_url).rstrip("/"),
+            tag=probe_tag,
+            request_kwargs=req,
+        )
     t0 = time.perf_counter()
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=temperature,
-        timeout=timeout,
-        stream=False,
-    )
+    resp = client.chat.completions.create(**req)
     total_s = time.perf_counter() - t0
     text = (resp.choices[0].message.content or "") if resp.choices else ""
     out_chars = len(text)
@@ -294,20 +342,39 @@ def run_probe(
     include_usage = True
     batch_id = str(uuid.uuid4())
     results: list[RunMetrics] = []
+    _warm_i = 0
+    _run_i = 0
 
     def one_stream() -> RunMetrics:
-        nonlocal include_usage
+        nonlocal include_usage, _warm_i, _run_i
         t0 = time.perf_counter()
+        tag = f"warmup{_warm_i}" if _warm_i < warmup else f"run{_run_i}"
         try:
             return run_once_stream(
-                client, model, prompt, max_tokens, temperature, timeout, include_usage
+                client,
+                model,
+                prompt,
+                max_tokens,
+                temperature,
+                timeout,
+                include_usage,
+                probe_batch_id=batch_id,
+                probe_tag=tag,
             )
         except APIError as e:
             if include_usage:
                 include_usage = False
                 try:
                     return run_once_stream(
-                        client, model, prompt, max_tokens, temperature, timeout, False
+                        client,
+                        model,
+                        prompt,
+                        max_tokens,
+                        temperature,
+                        timeout,
+                        False,
+                        probe_batch_id=batch_id,
+                        probe_tag=f"{tag}_no_usage_opt",
                     )
                 except Exception as ex:  # noqa: BLE001
                     return _failure_metric_stream(t0, ex)
@@ -316,9 +383,20 @@ def run_probe(
             return _failure_metric_stream(t0, e)
 
     def one_block() -> RunMetrics:
+        nonlocal _warm_i, _run_i
         t0 = time.perf_counter()
+        tag = f"warmup{_warm_i}" if _warm_i < warmup else f"run{_run_i}"
         try:
-            return run_once_blocking(client, model, prompt, max_tokens, temperature, timeout)
+            return run_once_blocking(
+                client,
+                model,
+                prompt,
+                max_tokens,
+                temperature,
+                timeout,
+                probe_batch_id=batch_id,
+                probe_tag=tag,
+            )
         except Exception as e:  # noqa: BLE001
             return _failure_metric_blocking(t0, e)
 
@@ -326,8 +404,10 @@ def run_probe(
 
     for _ in range(warmup):
         one()
+        _warm_i += 1
 
     for _ in range(runs):
         results.append(one())
+        _run_i += 1
 
     return results, batch_id
