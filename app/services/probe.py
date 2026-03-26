@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 
 from app.access_logging import access_http_logger
 from app.crypto_util import decrypt_secret
@@ -19,6 +22,43 @@ _http_access = access_http_logger()
 
 _manual_probe_lock = threading.Lock()
 _manual_probe_running = False
+
+
+def _max_parallel_probe_workers() -> int:
+    raw = os.environ.get("LLMTESTER_PROBE_PARALLEL", "12").strip()
+    try:
+        n = int(raw, 10)
+    except ValueError:
+        n = 12
+    return max(1, min(32, n))
+
+
+def _probe_target_by_id(target_id: int) -> int:
+    """
+    Один поток — одна цель: своя сессия БД, независимые HTTP к API провайдера.
+    Возвращает 1, если в БД сохранены строки замеров, иначе 0.
+    """
+    SessionLocal = get_session_local()
+    db = SessionLocal()
+    try:
+        target = db.scalars(
+            select(MonitoredTarget)
+            .where(MonitoredTarget.id == target_id)
+            .options(joinedload(MonitoredTarget.provider))
+        ).first()
+        if target is None:
+            return 0
+        if not target.model_name.strip():
+            _http_access.info("probe | skip target_id=%s reason=empty_model_name", target_id)
+            return 0
+        rows = run_target_probe(db, target)
+        return 1 if rows else 0
+    except Exception:
+        log.exception("Ошибка замера target_id=%s", target_id)
+        _http_access.info("probe | error target_id=%s see app log", target_id)
+        return 0
+    finally:
+        db.close()
 
 
 def run_all_enabled_probes_in_background() -> bool:
@@ -140,9 +180,11 @@ def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
 
 
 def run_all_enabled_probes(db: Session, *, probe_cycle_source: str = "scheduler") -> int:
+    cap = _max_parallel_probe_workers()
     _http_access.info(
-        "probes | cycle start source=%s (замеры не видны как входящий HTTP — это исходящие запросы к LLM)",
+        "probes | cycle start source=%s parallel_max=%s (цели независимо, по потоку на модель)",
         probe_cycle_source,
+        cap,
     )
     targets = (
         db.query(MonitoredTarget)
@@ -150,22 +192,35 @@ def run_all_enabled_probes(db: Session, *, probe_cycle_source: str = "scheduler"
         .filter(MonitoredTarget.enabled.is_(True), Provider.is_active.is_(True))
         .all()
     )
-    n = 0
+    ids: list[int] = []
     for t in targets:
         if not t.model_name.strip():
             _http_access.info("probe | skip target_id=%s reason=empty_model_name", t.id)
-            continue
-        try:
-            rows = run_target_probe(db, t)
-            if rows:
-                n += 1
-        except Exception:
-            log.exception("Ошибка замера target_id=%s", t.id)
-            _http_access.info("probe | error target_id=%s see app log", t.id)
+        else:
+            ids.append(t.id)
+
+    if not ids:
+        _http_access.info(
+            "probes | cycle end source=%s targets_with_saved_rows=0 candidates=%s",
+            probe_cycle_source,
+            len(targets),
+        )
+        return 0
+
+    workers = min(cap, len(ids))
+    n = 0
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="probe") as pool:
+        futures = [pool.submit(_probe_target_by_id, tid) for tid in ids]
+        for fut in as_completed(futures):
+            try:
+                n += int(fut.result())
+            except Exception:
+                log.exception("Сбой future замера")
     _http_access.info(
-        "probes | cycle end source=%s targets_with_saved_rows=%s candidates=%s",
+        "probes | cycle end source=%s targets_with_saved_rows=%s candidates=%s workers=%s",
         probe_cycle_source,
         n,
         len(targets),
+        workers,
     )
     return n

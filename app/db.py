@@ -19,6 +19,8 @@ def get_engine():
         connect_args = {}
         if url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
+            # Параллельные commit из потоков замеров (несколько целей сразу).
+            connect_args["timeout"] = 30.0
         _engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
         _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     return _engine
