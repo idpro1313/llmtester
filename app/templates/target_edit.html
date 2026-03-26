@@ -49,19 +49,37 @@
     datalist.innerHTML = '';
   }
 
+  var loadSeq = 0;
+
   async function loadModels() {
     const pid = providerSel.value;
     if (!pid) return;
+    var mySeq = ++loadSeq;
+    btn.disabled = true;
     status.textContent = 'Загрузка…';
+    status.className = 'muted';
     clearDatalist();
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 35000);
     try {
-      const r = await fetch('/api/providers/' + pid + '/models', { credentials: 'same-origin' });
+      const r = await fetch('/api/providers/' + pid + '/models', {
+        credentials: 'same-origin',
+        signal: ctrl.signal,
+      });
+      if (mySeq !== loadSeq) return;
       if (r.status === 401) {
         status.textContent = 'Сессия истекла — обновите страницу и войдите снова.';
         status.className = 'muted err';
         return;
       }
-      const d = await r.json();
+      var d;
+      try {
+        d = await r.json();
+      } catch (parseErr) {
+        status.textContent = 'Некорректный ответ сервера (HTTP ' + r.status + ').';
+        status.className = 'muted err';
+        return;
+      }
       if (!d.ok) {
         status.textContent = d.message || d.error || 'Ошибка';
         status.className = 'muted err';
@@ -79,8 +97,17 @@
       });
       status.textContent = 'Моделей: ' + d.models.length + '. Выберите из подсказок или введите своё.';
     } catch (e) {
-      status.textContent = 'Сеть или сессия: ' + e;
+      if (mySeq !== loadSeq) return;
+      if (e && e.name === 'AbortError') {
+        status.textContent =
+          'Сервер не ответил за 35 с. Проверьте сеть и base URL провайдера; введите модель вручную.';
+      } else {
+        status.textContent = 'Ошибка: ' + (e && e.message ? e.message : e);
+      }
       status.className = 'muted err';
+    } finally {
+      clearTimeout(timer);
+      if (mySeq === loadSeq) btn.disabled = false;
     }
   }
 
