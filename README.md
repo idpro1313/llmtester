@@ -71,6 +71,7 @@ python benchmark.py --model YOUR_MODEL --base-url https://.../v1 --api-key ...
 - `GET /api/metrics/series?hours=24&target_id=` — точки для графиков.
 - `GET /api/metrics/summary?hours=24` — агрегаты по целям (перцентили).
 - `GET /api/targets/options` — список целей для фильтра.
+- `GET /api/providers/{id}/models` — список моделей провайдера (OpenAI-compatible `/v1/models`, нужен сохранённый API-ключ).
 
 ## Структура проекта
 

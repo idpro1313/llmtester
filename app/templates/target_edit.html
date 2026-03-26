@@ -2,15 +2,30 @@
 {% block title %}{% if is_new %}Новая модель{% else %}Редактирование{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if is_new %}Новая цель мониторинга{% else %}Редактирование цели{% endif %}</h1>
-<form method="post" action="{% if is_new %}/admin/targets/new{% else %}/admin/targets/{{ target.id }}{% endif %}" class="stack narrow">
+<form method="post" action="{% if is_new %}/admin/targets/new{% else %}/admin/targets/{{ target.id }}{% endif %}" class="stack narrow" id="target_form">
   <label>Провайдер
-    <select name="provider_id" required>
+    <select name="provider_id" id="provider_id" required>
       {% for p in providers %}
       <option value="{{ p.id }}" {% if p.id == target.provider_id %}selected{% endif %}>{{ p.display_name }} ({{ p.slug }})</option>
       {% endfor %}
     </select>
   </label>
-  <label>Имя модели в API <input name="model_name" value="{{ target.model_name }}" required placeholder="gpt-4o-mini" /></label>
+  <label>Имя модели в API
+    <input
+      name="model_name"
+      id="model_name"
+      list="models_list"
+      value="{{ target.model_name }}"
+      required
+      placeholder="Выберите из списка или введите вручную"
+      autocomplete="off"
+    />
+    <datalist id="models_list"></datalist>
+  </label>
+  <p class="row-actions">
+    <button type="button" class="secondary" id="btn_load_models">Загрузить список моделей</button>
+    <span class="muted" id="models_status"></span>
+  </p>
   <label>max_tokens <input type="number" name="max_tokens" value="{{ target.max_tokens }}" min="1" max="128000" /></label>
   <label>temperature <input type="number" name="temperature" step="0.1" value="{{ target.temperature }}" /></label>
   <label>Замеров за один цикл <input type="number" name="runs_per_probe" value="{{ target.runs_per_probe }}" min="1" max="20" /></label>
@@ -22,4 +37,62 @@
   <button type="submit">Сохранить</button>
   <a href="/admin/targets">← Назад</a>
 </form>
+<script>
+(function () {
+  const providerSel = document.getElementById('provider_id');
+  const modelInput = document.getElementById('model_name');
+  const datalist = document.getElementById('models_list');
+  const btn = document.getElementById('btn_load_models');
+  const status = document.getElementById('models_status');
+
+  function clearDatalist() {
+    datalist.innerHTML = '';
+  }
+
+  async function loadModels() {
+    const pid = providerSel.value;
+    if (!pid) return;
+    status.textContent = 'Загрузка…';
+    clearDatalist();
+    try {
+      const r = await fetch('/api/providers/' + pid + '/models', { credentials: 'same-origin' });
+      if (r.status === 401) {
+        status.textContent = 'Сессия истекла — обновите страницу и войдите снова.';
+        status.className = 'muted err';
+        return;
+      }
+      const d = await r.json();
+      if (!d.ok) {
+        status.textContent = d.message || d.error || 'Ошибка';
+        status.className = 'muted err';
+        return;
+      }
+      status.className = 'muted';
+      if (!d.models || !d.models.length) {
+        status.textContent = 'Список пуст — введите имя модели вручную.';
+        return;
+      }
+      d.models.forEach(function (m) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        datalist.appendChild(opt);
+      });
+      status.textContent = 'Моделей: ' + d.models.length + '. Выберите из подсказок или введите своё.';
+    } catch (e) {
+      status.textContent = 'Сеть или сессия: ' + e;
+      status.className = 'muted err';
+    }
+  }
+
+  btn.addEventListener('click', loadModels);
+  providerSel.addEventListener('change', function () {
+    clearDatalist();
+    status.textContent = '';
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    loadModels();
+  });
+})();
+</script>
 {% endblock %}
