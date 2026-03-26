@@ -15,6 +15,19 @@
   <span class="muted">(в фоне, страница не ждёт ответа API)</span>
 </form>
 
+<section class="scheduler-bar" aria-label="Планировщик замеров">
+  <div class="scheduler-bar-inner">
+    <strong>Планировщик</strong>
+    <span id="schedulerStatusText" class="muted">Загрузка…</span>
+    <span id="schedulerInterval" class="muted"></span>
+  </div>
+  <div class="scheduler-bar-actions">
+    <button type="button" class="secondary" id="schedulerStartBtn">Старт</button>
+    <button type="button" class="secondary" id="schedulerStopBtn">Стоп</button>
+    <button type="button" class="secondary" id="schedulerRefreshBtn">Статус</button>
+  </div>
+</section>
+
 <section class="controls">
   <label>Окно (часы) <input type="number" id="hours" value="24" min="1" max="168" /></label>
   <label>Цель
@@ -213,8 +226,80 @@
   document.getElementById('refreshBtn').addEventListener('click', refresh);
   document.getElementById('hours').addEventListener('change', refresh);
   document.getElementById('targetFilter').addEventListener('change', refresh);
+
+  async function loadSchedulerStatus() {
+    const el = document.getElementById('schedulerStatusText');
+    const intEl = document.getElementById('schedulerInterval');
+    const startB = document.getElementById('schedulerStartBtn');
+    const stopB = document.getElementById('schedulerStopBtn');
+    try {
+      const r = await fetch('/api/scheduler/status', { credentials: 'same-origin' });
+      if (!r.ok) {
+        el.textContent = 'Не удалось получить статус (войдите снова).';
+        el.className = 'muted err';
+        intEl.textContent = '';
+        startB.disabled = true;
+        stopB.disabled = true;
+        return;
+      }
+      const s = await r.json();
+      intEl.textContent = 'Интервал в настройках: ' + s.interval_seconds + ' с.';
+      el.className = 'muted';
+      if (!s.scheduler_running) {
+        el.textContent = 'Поток планировщика остановлен (перезапустите приложение).';
+        el.className = 'muted err';
+      } else if (s.auto_probes_active) {
+        el.textContent = 'Автозамеры включены.';
+        el.className = 'ok';
+        if (s.next_run_time) {
+          el.textContent += ' Следующий цикл: ' + new Date(s.next_run_time).toLocaleString() + '.';
+        }
+      } else if (s.job_paused) {
+        el.textContent = 'На паузе: периодические замеры не выполняются.';
+      } else if (!s.job_present) {
+        el.textContent = 'Задача в планировщике не найдена.';
+        el.className = 'muted err';
+      } else {
+        el.textContent = 'Неактивно.';
+      }
+      startB.disabled = !!s.auto_probes_active;
+      stopB.disabled = !s.auto_probes_active;
+    } catch (e) {
+      el.textContent = 'Ошибка сети при запросе статуса.';
+      el.className = 'muted err';
+    }
+  }
+
+  document.getElementById('schedulerRefreshBtn').addEventListener('click', loadSchedulerStatus);
+  document.getElementById('schedulerStartBtn').addEventListener('click', async function () {
+    try {
+      const r = await fetch('/api/scheduler/start', { method: 'POST', credentials: 'same-origin' });
+      if (!r.ok) {
+        alert('Не удалось запустить (HTTP ' + r.status + ').');
+        return;
+      }
+      await loadSchedulerStatus();
+    } catch (e) {
+      alert('Ошибка сети.');
+    }
+  });
+  document.getElementById('schedulerStopBtn').addEventListener('click', async function () {
+    try {
+      const r = await fetch('/api/scheduler/stop', { method: 'POST', credentials: 'same-origin' });
+      if (!r.ok) {
+        alert('Не удалось остановить (HTTP ' + r.status + ').');
+        return;
+      }
+      await loadSchedulerStatus();
+    } catch (e) {
+      alert('Ошибка сети.');
+    }
+  });
+
   await loadTargets();
   await refresh();
+  await loadSchedulerStatus();
+  setInterval(loadSchedulerStatus, 15000);
 })();
 </script>
 {% endblock %}

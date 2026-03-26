@@ -14,7 +14,7 @@ from app.config import get_session_secret, get_settings
 from app.crypto_util import init_fernet_from_db
 from app.db import get_session_local
 from app.middleware.request_log import RequestLogMiddleware
-from app.routers import api_metrics, api_providers, pages
+from app.routers import api_metrics, api_providers, api_scheduler, pages
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(pages.router)
     app.include_router(api_metrics.router, prefix="/api")
     app.include_router(api_providers.router, prefix="/api")
+    app.include_router(api_scheduler.router, prefix="/api")
     static_dir = Path(__file__).resolve().parent / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
