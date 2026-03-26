@@ -167,9 +167,33 @@ button.link.danger { color: var(--err); }
   .charts {
     grid-template-columns: repeat(2, 1fr);
   }
-  .chart-box:nth-child(3) {
-    grid-column: 1 / -1;
-  }
+}
+
+.data.dashboard-summary {
+  font-size: 0.8rem;
+}
+.data.dashboard-summary th,
+.data.dashboard-summary td {
+  padding: 0.45rem 0.5rem;
+  vertical-align: top;
+}
+.data.dashboard-summary th {
+  white-space: nowrap;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.failures-block {
+  margin-top: 1.5rem;
+}
+.failures-block h2 { font-size: 1.15rem; }
+.failures-block .data {
+  font-size: 0.85rem;
+}
+.failures-block td.err-cell {
+  max-width: 420px;
+  word-break: break-word;
 }
 
 .login-body {

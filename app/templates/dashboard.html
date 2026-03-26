@@ -38,27 +38,61 @@
   <button type="button" id="refreshBtn">Обновить</button>
 </section>
 
-<section class="charts">
+<section class="charts" aria-label="Графики метрик">
   <div class="chart-box"><canvas id="chartTtft"></canvas></div>
   <div class="chart-box"><canvas id="chartTotal"></canvas></div>
-  <div class="chart-box"><canvas id="chartTps"></canvas></div>
+  <div class="chart-box"><canvas id="chartE2e"></canvas></div>
+  <div class="chart-box"><canvas id="chartGen"></canvas></div>
+  <div class="chart-box"><canvas id="chartPromptTok"></canvas></div>
+  <div class="chart-box"><canvas id="chartComplTok"></canvas></div>
+  <div class="chart-box"><canvas id="chartChars"></canvas></div>
+  <div class="chart-box"><canvas id="chartChunks"></canvas></div>
+  <div class="chart-box"><canvas id="chartGapMean"></canvas></div>
+  <div class="chart-box"><canvas id="chartGapMax"></canvas></div>
 </section>
 
-<h2>Сводка (перцентили по успешным замерам)</h2>
+<h2>Сводка (успешные замеры: p50 / p95)</h2>
+<p class="muted">Доля стрима и usage из API — среди успешных прогонов в окне.</p>
 <div class="table-wrap">
-  <table class="data" id="summaryTable">
+  <table class="data dashboard-summary" id="summaryTable">
     <thead>
       <tr>
-        <th>Цель</th>
-        <th>N</th>
-        <th>Ошибки %</th>
-        <th>TTFT p50 / p95</th>
-        <th>Total p50 / p95</th>
-        <th>e2e tok/s p50 / p95</th>
+        <th title="Цель мониторинга">Цель</th>
+        <th title="Всего записей">N</th>
+        <th title="Доля ошибок">Err %</th>
+        <th title="TTFT, с">TTFT</th>
+        <th title="Полное время, с">Total</th>
+        <th title="Токены/с end-to-end">e2e t/s</th>
+        <th title="Токены/с фаза генерации">gen t/s</th>
+        <th title="Prompt tokens">prompt</th>
+        <th title="Completion tokens">compl</th>
+        <th title="Символов в ответе">chars</th>
+        <th title="Чанков со текстом">chunks</th>
+        <th title="Средний зазор между чанками, с">Δ mean</th>
+        <th title="Макс. зазор между чанками, с">Δ max</th>
+        <th title="Доля стриминговых запросов">стрим</th>
+        <th title="Доля замеров, где токены из usage API">usage</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
+</div>
+
+<div class="failures-block" id="failuresBlock" hidden>
+  <h2>Ошибки в выбранном окне</h2>
+  <div class="table-wrap">
+    <table class="data" id="failuresTable">
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Цель</th>
+          <th>HTTP</th>
+          <th>Сообщение</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 </div>
 
 {% if targets %}
@@ -179,13 +213,41 @@
     return a + ' / ' + b;
   }
 
+  function pctShare(x) {
+    if (x == null || typeof x !== 'number') return '—';
+    return (100 * x).toFixed(0) + '%';
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  const CHART_SPECS = [
+    ['chartTtft', 'ttft_s', 'TTFT (с)'],
+    ['chartTotal', 'total_s', 'Полное время (с)'],
+    ['chartE2e', 'e2e_tps', 'Токены/с (e2e)'],
+    ['chartGen', 'gen_tps', 'Токены/с (генерация)'],
+    ['chartPromptTok', 'prompt_tokens', 'Prompt tokens'],
+    ['chartComplTok', 'completion_tokens', 'Completion tokens'],
+    ['chartChars', 'output_chars', 'Символов в ответе'],
+    ['chartChunks', 'chunk_count', 'Чанков (стрим)'],
+    ['chartGapMean', 'inter_chunk_gap_mean_s', 'Средний зазор чанков (с)'],
+    ['chartGapMax', 'inter_chunk_gap_max_s', 'Макс. зазор чанков (с)'],
+  ];
+
   async function refresh() {
     const hours = document.getElementById('hours').value || 24;
     const tid = document.getElementById('targetFilter').value;
     let url = '/api/metrics/series?hours=' + hours;
     if (tid) url += '&target_id=' + tid;
     const rs = await fetch(url, { credentials: 'same-origin' });
-    const ru = await fetch('/api/metrics/summary?hours=' + hours, { credentials: 'same-origin' });
+    let su = '/api/metrics/summary?hours=' + hours;
+    if (tid) su += '&target_id=' + tid;
+    const ru = await fetch(su, { credentials: 'same-origin' });
     if (!rs.ok || !ru.ok) {
       alert('Не удалось загрузить метрики (войдите заново, если сессия истекла).');
       return;
@@ -195,32 +257,67 @@
 
     destroyCharts();
     const pts = series.points;
-    charts.push(new Chart(document.getElementById('chartTtft'), {
-      type: 'line',
-      data: { datasets: mapPoints(pts, 'ttft_s') },
-      options: chartOpts('TTFT (с)'),
-    }));
-    charts.push(new Chart(document.getElementById('chartTotal'), {
-      type: 'line',
-      data: { datasets: mapPoints(pts, 'total_s') },
-      options: chartOpts('Полное время (с)'),
-    }));
-    charts.push(new Chart(document.getElementById('chartTps'), {
-      type: 'line',
-      data: { datasets: mapPoints(pts, 'e2e_tps') },
-      options: chartOpts('Токены/с (e2e)'),
-    }));
+    CHART_SPECS.forEach(function (spec) {
+      const el = document.getElementById(spec[0]);
+      if (!el) return;
+      charts.push(
+        new Chart(el, {
+          type: 'line',
+          data: { datasets: mapPoints(pts, spec[1]) },
+          options: chartOpts(spec[2]),
+        })
+      );
+    });
 
     const tb = document.querySelector('#summaryTable tbody');
     tb.innerHTML = '';
-    summary.targets.forEach(t => {
+    summary.targets.forEach(function (t) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + t.label + '</td><td>' + t.samples + '</td><td>' + (100*t.error_rate).toFixed(1) + '</td>' +
+      tr.innerHTML =
+        '<td>' + escHtml(t.label) + '</td>' +
+        '<td>' + t.samples + '</td>' +
+        '<td>' + (100 * t.error_rate).toFixed(1) + '</td>' +
         '<td>' + fmtPair(t.ttft_s, 3) + '</td>' +
         '<td>' + fmtPair(t.total_s, 3) + '</td>' +
-        '<td>' + fmtPair(t.e2e_tps, 1) + '</td>';
+        '<td>' + fmtPair(t.e2e_tps, 1) + '</td>' +
+        '<td>' + fmtPair(t.gen_tps, 1) + '</td>' +
+        '<td>' + fmtPair(t.prompt_tokens, 0) + '</td>' +
+        '<td>' + fmtPair(t.completion_tokens, 0) + '</td>' +
+        '<td>' + fmtPair(t.output_chars, 0) + '</td>' +
+        '<td>' + fmtPair(t.chunk_count, 0) + '</td>' +
+        '<td>' + fmtPair(t.inter_chunk_gap_mean_s, 4) + '</td>' +
+        '<td>' + fmtPair(t.inter_chunk_gap_max_s, 4) + '</td>' +
+        '<td>' + pctShare(t.stream_share) + '</td>' +
+        '<td>' + pctShare(t.usage_api_share) + '</td>';
       tb.appendChild(tr);
     });
+
+    const failBlock = document.getElementById('failuresBlock');
+    const failTb = document.querySelector('#failuresTable tbody');
+    failTb.innerHTML = '';
+    const fails = pts
+      .filter(function (p) {
+        return !p.success;
+      })
+      .sort(function (a, b) {
+        return Date.parse(b.t) - Date.parse(a.t);
+      })
+      .slice(0, 50);
+    if (fails.length === 0) {
+      failBlock.hidden = true;
+    } else {
+      failBlock.hidden = false;
+      fails.forEach(function (p) {
+        const tr = document.createElement('tr');
+        const msg = (p.error_message || '—').slice(0, 800);
+        tr.innerHTML =
+          '<td>' + escHtml(new Date(p.t).toLocaleString()) + '</td>' +
+          '<td>' + escHtml(p.label) + '</td>' +
+          '<td>' + (p.http_status != null ? p.http_status : '—') + '</td>' +
+          '<td class="err-cell">' + escHtml(msg) + '</td>';
+        failTb.appendChild(tr);
+      });
+    }
   }
 
   document.getElementById('refreshBtn').addEventListener('click', refresh);

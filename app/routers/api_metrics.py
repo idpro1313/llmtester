@@ -51,17 +51,27 @@ def metrics_series(
         points.append(
             {
                 "t": m.created_at.isoformat(),
+                "measurement_id": m.id,
                 "target_id": t.id,
+                "batch_id": m.batch_id,
+                "run_index": m.run_index,
                 "label": label,
                 "provider_slug": p.slug,
                 "success": m.success,
+                "error_message": m.error_message,
+                "http_status": m.http_status,
                 "ttft_s": m.ttft_s,
                 "total_s": m.total_s,
-                "e2e_tps": m.e2e_tps,
-                "gen_tps": m.gen_tps,
+                "prompt_tokens": m.prompt_tokens,
                 "completion_tokens": m.completion_tokens,
+                "output_chars": m.output_chars,
+                "gen_tps": m.gen_tps,
+                "e2e_tps": m.e2e_tps,
+                "stream": m.stream,
                 "chunk_count": m.chunk_count,
+                "usage_from_api": m.usage_from_api,
                 "inter_chunk_gap_mean_s": m.inter_chunk_gap_mean_s,
+                "inter_chunk_gap_max_s": m.inter_chunk_gap_max_s,
             }
         )
     return {"points": points}
@@ -72,6 +82,7 @@ def metrics_summary(
     db: Annotated[Session, Depends(get_db)],
     _user: Annotated[AdminUser, Depends(require_admin)],
     hours: int = Query(24, ge=1, le=168),
+    target_id: int | None = None,
 ) -> dict[str, Any]:
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
     q = (
@@ -79,6 +90,8 @@ def metrics_summary(
         .where(Measurement.created_at >= since)
         .options(joinedload(Measurement.target).joinedload(MonitoredTarget.provider))
     )
+    if target_id is not None:
+        q = q.where(Measurement.target_id == target_id)
     rows = db.scalars(q).unique().all()
     by_target: dict[int, list[Measurement]] = {}
     for m in rows:
@@ -89,6 +102,7 @@ def metrics_summary(
         t = ms[0].target
         p = t.provider
         ok = [m for m in ms if m.success]
+
         def pull(attr: str) -> list[float]:
             return [float(getattr(m, attr)) for m in ok if getattr(m, attr) is not None]
 
@@ -96,6 +110,12 @@ def metrics_summary(
         tot = sorted(pull("total_s"))
         e2e = sorted(pull("e2e_tps"))
         gen = sorted(pull("gen_tps"))
+        ptok = sorted(pull("prompt_tokens"))
+        ctok = sorted(pull("completion_tokens"))
+        och = sorted(pull("output_chars"))
+        chn = sorted(pull("chunk_count"))
+        gapm = sorted(pull("inter_chunk_gap_mean_s"))
+        gapx = sorted(pull("inter_chunk_gap_max_s"))
 
         def pack(vals: list[float]) -> dict[str, float | None]:
             if not vals:
@@ -109,6 +129,12 @@ def metrics_summary(
                 "max": vals[-1],
             }
 
+        with_ct = [m for m in ok if m.completion_tokens is not None]
+        usage_api_share = (
+            (sum(1 for m in with_ct if m.usage_from_api) / len(with_ct)) if with_ct else None
+        )
+        stream_share = (sum(1 for m in ok if m.stream) / len(ok)) if ok else None
+
         summaries.append(
             {
                 "target_id": tid,
@@ -121,6 +147,14 @@ def metrics_summary(
                 "total_s": pack(tot),
                 "e2e_tps": pack(e2e),
                 "gen_tps": pack(gen),
+                "prompt_tokens": pack(ptok),
+                "completion_tokens": pack(ctok),
+                "output_chars": pack(och),
+                "chunk_count": pack(chn),
+                "inter_chunk_gap_mean_s": pack(gapm),
+                "inter_chunk_gap_max_s": pack(gapx),
+                "stream_share": stream_share,
+                "usage_api_share": usage_api_share,
             }
         )
 
