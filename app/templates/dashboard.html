@@ -110,6 +110,22 @@
 {% endif %}
 <script>
 (async function () {
+  /** Отображение времени замеров и планировщика: Москва (UTC+3, без перехода на летнее). */
+  const DISPLAY_TZ = 'Europe/Moscow';
+  const chartTimeOpts = {
+    timeZone: DISPLAY_TZ,
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  };
+  function formatDisplayTime(v) {
+    if (v == null) return '';
+    return new Date(v).toLocaleString('ru-RU', chartTimeOpts);
+  }
+
   const colors = ['#5b8def', '#3ecf8e', '#f0b429', '#e85d75', '#a78bfa', '#22d3ee'];
   let charts = [];
 
@@ -155,14 +171,7 @@
   }
 
   function chartOpts(title) {
-    const timeTick = (v) =>
-      new Date(v).toLocaleString(undefined, {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
+    const timeTick = (v) => formatDisplayTime(v);
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -190,7 +199,7 @@
           callbacks: {
             title: (items) => {
               const x = items[0] && items[0].parsed.x;
-              return x != null ? new Date(x).toLocaleString() : '';
+              return x != null ? formatDisplayTime(x) : '';
             },
           },
         },
@@ -359,7 +368,7 @@
         el.textContent = 'Автозамеры включены.';
         el.className = 'ok';
         if (s.next_run_time) {
-          el.textContent += ' Следующий цикл: ' + new Date(s.next_run_time).toLocaleString() + '.';
+          el.textContent += ' Следующий цикл: ' + formatDisplayTime(s.next_run_time) + ' (МСК).';
         }
       } else if (s.job_paused) {
         el.textContent = 'На паузе: периодические замеры не выполняются.';
