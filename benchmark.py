@@ -229,6 +229,7 @@ def main(argv: list[str]) -> None:
     client = OpenAI(
         api_key=args.api_key,
         base_url=args.base_url.rstrip("/"),
+        max_retries=0,
     )
 
     stream_include_usage = True

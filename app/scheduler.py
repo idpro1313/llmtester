@@ -46,7 +46,13 @@ def attach_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
         return _scheduler
-    _scheduler = BackgroundScheduler(timezone="UTC")
+    _scheduler = BackgroundScheduler(
+        timezone="UTC",
+        job_defaults={
+            "coalesce": True,
+            "max_instances": 1,
+        },
+    )
     return _scheduler
 
 
@@ -61,7 +67,15 @@ def start_scheduler_from_db() -> None:
     thread_was_running = sch.running
     if sch.get_job(JOB_ID):
         sch.remove_job(JOB_ID)
-    sch.add_job(_tick, "interval", seconds=interval, id=JOB_ID, replace_existing=True)
+    sch.add_job(
+        _tick,
+        "interval",
+        seconds=interval,
+        id=JOB_ID,
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
     if not sch.running:
         sch.start()
     log.info("Планировщик: интервал %s с", interval)
@@ -97,7 +111,15 @@ def reschedule_from_db() -> None:
     if job:
         sch.reschedule_job(JOB_ID, trigger="interval", seconds=interval)
     else:
-        sch.add_job(_tick, "interval", seconds=interval, id=JOB_ID, replace_existing=True)
+        sch.add_job(
+        _tick,
+        "interval",
+        seconds=interval,
+        id=JOB_ID,
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
     if was_paused:
         _pause_job_if_present(sch)
     log.info("Планировщик перенастроен: интервал %s с", interval)

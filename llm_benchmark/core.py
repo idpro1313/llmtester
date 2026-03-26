@@ -289,6 +289,7 @@ def run_probe(
     client = OpenAI(
         api_key=api_key,
         base_url=base_url.rstrip("/"),
+        max_retries=0,
     )
     include_usage = True
     batch_id = str(uuid.uuid4())
