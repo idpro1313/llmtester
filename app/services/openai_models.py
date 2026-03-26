@@ -10,6 +10,7 @@ import httpx
 
 from app.access_logging import ACCESS_LOGGER_NAME
 from app.middleware.body_log import body_bytes_to_log_line
+from llm_benchmark.provider_headers import x_api_key_headers
 
 _log = logging.getLogger(ACCESS_LOGGER_NAME)
 
@@ -46,18 +47,17 @@ def list_model_ids(base_url: str, api_key: str) -> tuple[list[str], str | None]:
     _log.info("upstream begin GET %s (таймауты httpx: connect=8s read=22s)", url)
     try:
         with httpx.Client(timeout=timeout) as client:
-            r = client.get(
-                url,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Accept": "application/json",
-                },
-            )
+            h = {
+                "Authorization": f"Bearer {api_key.strip()}",
+                "Accept": "application/json",
+            }
+            h.update(x_api_key_headers(api_key))
+            r = client.get(url, headers=h)
         ms = (time.perf_counter() - t0) * 1000.0
         ct = r.headers.get("content-type")
         body = r.content
         _log.info("upstream GET %s %s %.1fms", url, r.status_code, ms)
-        _log.info("  upstream_req: [Authorization: Bearer ***]")
+        _log.info("  upstream_req: [Authorization: Bearer ***, X-API-KEY: ***]")
         _log.info("  upstream_resp: %s", body_bytes_to_log_line(body, ct))
 
         if r.status_code >= 400:
