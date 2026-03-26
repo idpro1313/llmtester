@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body class="login-body">
+  <div class="login-stack">
   <div class="login-card">
     <h1>Мониторинг инференса LLM</h1>
     {% if msg %}
@@ -17,6 +18,8 @@
       <label>Пароль <input type="password" name="password" required autocomplete="current-password" /></label>
       <button type="submit">Войти</button>
     </form>
+  </div>
+  {% include "_footer.html" %}
   </div>
 </body>
 </html>

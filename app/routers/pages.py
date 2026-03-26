@@ -27,7 +27,7 @@ _log = logging.getLogger(__name__)
 
 
 def _ctx(request: Request, **extra):
-    return {"request": request, **extra}
+    return {"request": request, "app_version": get_version(), **extra}
 
 
 def _tpl(request: Request, name: str, *, status_code: int = 200, **ctx: Any):

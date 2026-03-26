@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body class="login-body">
+  <div class="login-stack">
   <div class="login-card">
     <h1>Первичная настройка</h1>
     <p class="muted">Задайте логин и пароль администратора (один раз).</p>
@@ -19,6 +20,8 @@
       <label>Пароль ещё раз <input type="password" name="password2" required minlength="8" autocomplete="new-password" /></label>
       <button type="submit">Создать и перейти ко входу</button>
     </form>
+  </div>
+  {% include "_footer.html" %}
   </div>
 </body>
 </html>
