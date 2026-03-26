@@ -21,5 +21,5 @@
 {% endif %}
 
 <pre class="log-view" id="log_pre">{{ log_text }}</pre>
-<p class="muted">Новые записи внизу файла; здесь выводится хвост. Запросы к <code>/static</code>, <code>/health</code> и <code>/favicon.ico</code> в лог не пишутся. Для <code>/api/*</code> после строки сводки идут <code>req:</code> и <code>resp:</code> (тела обрезаются, в JSON маскируются поля вроде password/api_key).</p>
+<p class="muted">Новые записи внизу файла; здесь выводится хвост. Запросы к <code>/static</code>, <code>/health</code> и <code>/favicon.ico</code> в лог не пишутся. Для <code>/api/*</code> после строки сводки идут <code>req:</code> и <code>resp:</code>. Запрос к провайдеру при загрузке списка моделей виден отдельно как <code>upstream GET …</code>, <code>upstream_req</code>, <code>upstream_resp</code> (ключ в лог не выводится).</p>
 {% endblock %}
