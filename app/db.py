@@ -3,7 +3,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import get_settings
+from app.config import sqlalchemy_url
 
 
 class Base(DeclarativeBase):
@@ -15,8 +15,7 @@ _SessionLocal = None
 def get_engine():
     global _engine, _SessionLocal
     if _engine is None:
-        s = get_settings()
-        url = s.sqlalchemy_url
+        url = sqlalchemy_url()
         connect_args = {}
         if url.startswith("sqlite"):
             connect_args["check_same_thread"] = False

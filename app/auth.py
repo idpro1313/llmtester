@@ -14,6 +14,10 @@ from passlib.context import CryptContext
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def hash_password(plain: str) -> str:
+    return _pwd.hash(plain)
+
+
 def verify_password(plain: str, hashed: str) -> bool:
     return _pwd.verify(plain, hashed)
 
@@ -50,3 +54,7 @@ def session_admin_user(request: Request, db: Session) -> AdminUser | None:
     if not uid:
         return None
     return db.get(AdminUser, int(uid))
+
+
+def has_any_admin(db: Session) -> bool:
+    return db.scalar(select(AdminUser).limit(1)) is not None

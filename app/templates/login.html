@@ -10,7 +10,7 @@
   <div class="login-card">
     <h1>Мониторинг инференса LLM</h1>
     {% if msg %}
-    <p class="error">{{ msg }}</p>
+    <p class="{{ 'ok' if msg_ok else 'error' }}">{{ msg }}</p>
     {% endif %}
     <form method="post" action="/login" class="stack">
       <label>Логин <input name="username" required autocomplete="username" /></label>

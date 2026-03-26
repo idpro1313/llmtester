@@ -9,7 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.bootstrap import ensure_schema, seed_if_empty
-from app.config import get_settings
+from app.config import get_session_secret, get_settings
+from app.crypto_util import init_fernet_from_db
 from app.db import get_session_local
 from app.routers import api_metrics, pages
 
@@ -24,6 +25,7 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         seed_if_empty(db)
+        init_fernet_from_db(db)
     finally:
         db.close()
 
@@ -38,9 +40,9 @@ async def lifespan(_app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    s = get_settings()
+    get_settings()
     app = FastAPI(title="LLM Inference Monitor", lifespan=lifespan)
-    app.add_middleware(SessionMiddleware, secret_key=s.session_secret, max_age=86400 * 7)
+    app.add_middleware(SessionMiddleware, secret_key=get_session_secret(), max_age=86400 * 7)
     app.include_router(pages.router)
     app.include_router(api_metrics.router, prefix="/api")
     static_dir = Path(__file__).resolve().parent / "static"

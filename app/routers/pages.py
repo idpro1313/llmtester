@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import login_user, session_admin_user
+from app.auth import has_any_admin, hash_password, login_user, session_admin_user
 from app.crypto_util import encrypt_secret
 from app.db import get_db
 from app.models import AdminUser, GlobalSettings, MonitoredTarget, Provider
@@ -32,10 +33,21 @@ def _need_user(request: Request, db: Session) -> AdminUser | RedirectResponse:
 
 
 @router.get("/login")
-def login_page(request: Request, msg: str = ""):
+def login_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+):
     if request.session.get("admin_user_id"):
         return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("login.html", _ctx(request, msg=msg))
+    if not has_any_admin(db):
+        return RedirectResponse("/setup", status_code=302)
+    q = request.query_params.get("msg", "")
+    msg = ""
+    msg_ok = False
+    if q == "created":
+        msg = "Учётная запись создана. Войдите."
+        msg_ok = True
+    return templates.TemplateResponse("login.html", _ctx(request, msg=msg, msg_ok=msg_ok))
 
 
 @router.post("/login")
@@ -49,7 +61,7 @@ def login_post(
     if user is None:
         return templates.TemplateResponse(
             "login.html",
-            _ctx(request, msg="Неверный логин или пароль"),
+            _ctx(request, msg="Неверный логин или пароль", msg_ok=False),
             status_code=401,
         )
     request.session["admin_user_id"] = user.id
@@ -62,9 +74,66 @@ def logout(request: Request):
     return RedirectResponse("/login", status_code=302)
 
 
+@router.get("/setup")
+def setup_page(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    msg: str = "",
+):
+    if request.session.get("admin_user_id"):
+        return RedirectResponse("/dashboard", status_code=302)
+    if has_any_admin(db):
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("setup.html", _ctx(request, msg=msg))
+
+
+@router.post("/setup")
+def setup_post(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    username: str = Form(...),
+    password: str = Form(...),
+    password2: str = Form(...),
+):
+    if has_any_admin(db):
+        return RedirectResponse("/login", status_code=302)
+    u = username.strip()
+    if len(u) < 2:
+        return templates.TemplateResponse(
+            "setup.html",
+            _ctx(request, msg="Логин не короче 2 символов."),
+            status_code=400,
+        )
+    if len(password) < 8:
+        return templates.TemplateResponse(
+            "setup.html",
+            _ctx(request, msg="Пароль не короче 8 символов."),
+            status_code=400,
+        )
+    if password != password2:
+        return templates.TemplateResponse(
+            "setup.html",
+            _ctx(request, msg="Пароли не совпадают."),
+            status_code=400,
+        )
+    try:
+        db.add(AdminUser(username=u, password_hash=hash_password(password)))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return templates.TemplateResponse(
+            "setup.html",
+            _ctx(request, msg="Такой логин уже занят."),
+            status_code=400,
+        )
+    return RedirectResponse("/login?msg=created", status_code=302)
+
+
 @router.get("/")
-def root(request: Request):
+def root(request: Request, db: Annotated[Session, Depends(get_db)]):
     if not request.session.get("admin_user_id"):
+        if not has_any_admin(db):
+            return RedirectResponse("/setup", status_code=302)
         return RedirectResponse("/login", status_code=302)
     return RedirectResponse("/dashboard", status_code=302)
 

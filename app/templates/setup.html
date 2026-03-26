@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Первый вход — LLM Monitor</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>Первичная настройка</h1>
+    <p class="muted">Задайте логин и пароль администратора (один раз).</p>
+    {% if msg %}
+    <p class="error">{{ msg }}</p>
+    {% endif %}
+    <form method="post" action="/setup" class="stack">
+      <label>Логин <input name="username" required minlength="2" autocomplete="username" /></label>
+      <label>Пароль (не короче 8 символов) <input type="password" name="password" required minlength="8" autocomplete="new-password" /></label>
+      <label>Пароль ещё раз <input type="password" name="password2" required minlength="8" autocomplete="new-password" /></label>
+      <button type="submit">Создать и перейти ко входу</button>
+    </form>
+  </div>
+</body>
+</html>

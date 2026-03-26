@@ -5,17 +5,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import Base, get_engine
-from app.models import AdminUser, GlobalSettings, Provider
+from app.models import GlobalSettings, Provider
 from llm_benchmark.core import DEFAULT_PROMPT
-from passlib.context import CryptContext
-
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(p: str) -> str:
-    return _pwd.hash(p)
 
 
 def ensure_schema() -> None:
@@ -24,7 +16,6 @@ def ensure_schema() -> None:
 
 
 def seed_if_empty(db: Session) -> None:
-    s = get_settings()
     if db.scalar(select(GlobalSettings).where(GlobalSettings.id == 1)) is None:
         db.add(
             GlobalSettings(
@@ -53,13 +44,5 @@ def seed_if_empty(db: Session) -> None:
                     sort_order=order,
                 )
             )
-
-    if db.scalar(select(AdminUser).limit(1)) is None:
-        db.add(
-            AdminUser(
-                username=s.admin_username,
-                password_hash=hash_password(s.admin_password),
-            )
-        )
 
     db.commit()

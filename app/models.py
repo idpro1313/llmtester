@@ -28,6 +28,15 @@ class GlobalSettings(Base):
     default_timeout: Mapped[float] = mapped_column(Float, default=120.0, nullable=False)
 
 
+class AppCryptoState(Base):
+    """Одна строка (id=1): симметричный ключ Fernet для шифрования секретов провайдеров."""
+
+    __tablename__ = "app_crypto_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fernet_key: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
 class Provider(Base):
     __tablename__ = "providers"
 
