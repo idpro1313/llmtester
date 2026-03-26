@@ -8,10 +8,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.access_logging import setup_access_logging
 from app.bootstrap import ensure_schema, seed_if_empty
 from app.config import get_session_secret, get_settings
 from app.crypto_util import init_fernet_from_db
 from app.db import get_session_local
+from app.middleware.request_log import RequestLogMiddleware
 from app.routers import api_metrics, api_providers, pages
 
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    setup_access_logging()
     ensure_schema()
     SessionLocal = get_session_local()
     db = SessionLocal()
@@ -42,6 +45,8 @@ async def lifespan(_app: FastAPI):
 def create_app() -> FastAPI:
     get_settings()
     app = FastAPI(title="LLM Inference Monitor", lifespan=lifespan)
+    # Сначала регистрируем внутренний слой, чтобы SessionMiddleware обрабатывал запрос раньше и session был в логе.
+    app.add_middleware(RequestLogMiddleware)
     app.add_middleware(SessionMiddleware, secret_key=get_session_secret(), max_age=86400 * 7)
     app.include_router(pages.router)
     app.include_router(api_metrics.router, prefix="/api")
