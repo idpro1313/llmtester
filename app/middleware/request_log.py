@@ -1,6 +1,7 @@
 """Логирование входящих HTTP-запросов (метод, путь, статус, время, клиент).
 
-Пути /api/* не пишутся (внутренний API приложения). Исходящие вызовы к провайдерам логируются отдельно в том же файле (см. openai_models и др.).
+Не пишутся: /api/*, /static/*, типовые GET страниц UI (дашборд, /admin/*, логин и т.д.).
+POST/DELETE к админке остаются в логе. Исходящие вызовы к провайдерам — отдельные строки upstream.
 """
 
 from __future__ import annotations
@@ -18,12 +19,25 @@ _log = logging.getLogger(ACCESS_LOGGER_NAME)
 
 _SKIP_PATH_PREFIXES = ("/static/", "/api/")
 _SKIP_PATHS = frozenset({"/health", "/favicon.ico", "/api"})
+# GET к «просмотру» страниц не засоряют лог; изменения — POST (и редкие GET вне списка).
+_SKIP_GET_PATHS = frozenset({"/", "/dashboard", "/login", "/setup", "/logout"})
+_ADMIN_PREFIX = "/admin/"
+
+
+def _skip_request_log(request: Request, path: str) -> bool:
+    if path in _SKIP_PATHS or any(path.startswith(p) for p in _SKIP_PATH_PREFIXES):
+        return True
+    if request.method == "GET" and path in _SKIP_GET_PATHS:
+        return True
+    if request.method == "GET" and path.startswith(_ADMIN_PREFIX):
+        return True
+    return False
 
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
-        if path in _SKIP_PATHS or any(path.startswith(p) for p in _SKIP_PATH_PREFIXES):
+        if _skip_request_log(request, path):
             return await call_next(request)
 
         t0 = time.perf_counter()

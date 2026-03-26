@@ -21,5 +21,5 @@
 {% endif %}
 
 <pre class="log-view" id="log_pre">{{ log_text }}</pre>
-<p class="muted">Новые записи внизу файла; здесь выводится хвост. В лог <strong>не</strong> попадают запросы к <code>/api/*</code> (внутренний API), <code>/static</code>, <code>/health</code> и <code>/favicon.ico</code>. Исходящий запрос списка моделей — строки <code>upstream begin OpenAI.models.list …</code> и <code>upstream models.list ok …</code> (без тела ответа).</p>
+<p class="muted">Новые записи внизу файла; здесь выводится хвост. В лог <strong>не</strong> попадают: <code>/api/*</code>, <code>/static</code>, <code>/health</code>, <code>/favicon.ico</code>, а также обычные <strong>GET</strong> к страницам (<code>/dashboard</code>, <code>/login</code>, <code>/setup</code>, любые <code>/admin/*</code> и т.д.). Остаются, например, <strong>POST</strong> (сохранение форм, «Запустить замеры»). Исходящие вызовы к провайдеру — <code>upstream begin</code> / <code>upstream models.list …</code>.</p>
 {% endblock %}
