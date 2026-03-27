@@ -103,6 +103,27 @@ Git-сервер: **`https://gitlabacr.aplanadc.ru/`**, группа/namespace: 
 
 Для **HTTPS** GitLab обычно нужен **Personal Access Token** вместо пароля при запросе учётных данных.
 
+### Push в GitLab и GitHub одной командой
+
+У `origin` может быть **несколько push-URL**: тогда **`git push origin`** (и обычный **`git push`**, если ветка отслеживает `origin/...`) отправляет текущую ветку **на оба сервера** подряд.
+
+На **новом клоне** после `git remote add origin <url GitLab>` добавьте второй push-URL (и явно закрепите GitLab как push, чтобы не остался только GitHub):
+
+```bash
+git remote set-url --add --push origin https://gitlabacr.aplanadc.ru/IYatsishen/llmtester.git
+git remote set-url --add --push origin https://github.com/idpro1313/llmtester.git
+```
+
+Проверка: `git remote -v` — у `origin` одна строка `(fetch)` и **две** строки `(push)`; `git push --dry-run origin main` дважды пишет про отправку.
+
+**Все локальные ветки** разом на оба сервера:
+
+```bash
+git push --all origin
+```
+
+Отдельный remote **`github`** для push **не обязателен**: при двух push-URL у `origin` можно выполнить `git remote remove github`, чтобы в списке веток в IDE не дублировались `github/main` и `origin/main` (fetch при необходимости — с `origin` или снова `git remote add github <url>`).
+
 CI/CD в репозитории **не используется** (файла `.gitlab-ci.yml` нет).
 
 ## Безопасность
