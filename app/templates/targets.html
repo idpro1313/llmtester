@@ -9,13 +9,14 @@
 <table class="data">
   <thead>
     <tr>
-      <th>Провайдер</th><th>Модель</th><th>Вкл.</th><th>Стрим</th><th>Замеров</th><th></th>
+      <th>Провайдер</th><th>Тип</th><th>Модель</th><th>Вкл.</th><th>Стрим</th><th>Замеров</th><th></th>
     </tr>
   </thead>
   <tbody>
     {% for t in targets %}
     <tr>
       <td>{{ t.provider.display_name }}</td>
+      <td>{{ probe_kind_labels.get(t.probe_kind, t.probe_kind) }}</td>
       <td><code>{{ t.model_name }}</code></td>
       <td>{% if t.enabled %}да{% else %}нет{% endif %}</td>
       <td>{% if t.use_stream %}да{% else %}нет{% endif %}</td>
@@ -28,7 +29,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="muted">Нет целей. Добавьте модель и включите провайдера.</td></tr>
+    <tr><td colspan="7" class="muted">Нет целей. Добавьте модель и включите провайдера.</td></tr>
     {% endfor %}
   </tbody>
 </table>

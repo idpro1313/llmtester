@@ -18,7 +18,9 @@
 | `app/services/` | Бизнес-логика замеров, экспорт, список моделей upstream. |
 | `app/models.py`, `app/db.py` | ORM и сессии (**M-DATA**, **M-DB**). |
 | `app/scheduler.py` | APScheduler (**M-SCHEDULER**). |
-| `llm_benchmark/` | Ядро замеров (**M-LLM-BENCHMARK**); `benchmark.py` — CLI. |
+| `llm_benchmark/` | Ядро замеров: **M-LLM-BENCHMARK** (`core.py`, чат), **M-LLM-BENCHMARK-EXTRA** (`non_chat_probes.py`); `benchmark.py` — CLI (чат). |
+| `app/probe_kinds.py`, `app/task_config.py` | Константы типов замеров и парсинг `task_config_json`. |
+| `app/schema_migrate.py` | Additive колонки БД (**M-SCHEMA-MIGRATE**). |
 | `docs/` | GRACE: `requirements.xml`, `technology.xml`, `development-plan.xml`, `verification-plan.xml`, `knowledge-graph.xml`, этот файл. |
 
 ## API (кратко)

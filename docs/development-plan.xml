@@ -21,14 +21,20 @@
   <module id="M-DATA">
     <name>ORM-модели</name>
     <path>app/models.py</path>
-    <contracts>Сущности admin_users, global_settings, providers, monitored_targets, measurements, app_crypto_state.</contracts>
+    <contracts>monitored_targets: probe_kind, task_config_json; measurements: probe_kind; прочие сущности без изменений.</contracts>
     <depends-on>M-DB</depends-on>
+  </module>
+  <module id="M-SCHEMA-MIGRATE">
+    <name>Additive миграции колонок</name>
+    <path>app/schema_migrate.py</path>
+    <contracts>migrate_engine после create_all — новые колонки без Alembic.</contracts>
+    <depends-on>M-DB,M-DATA</depends-on>
   </module>
   <module id="M-BOOT">
     <name>Схема и начальные данные</name>
     <path>app/bootstrap.py</path>
-    <contracts>create_all; сид GlobalSettings и шаблонных Provider.</contracts>
-    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK</depends-on>
+    <contracts>create_all; migrate_engine; сид GlobalSettings и шаблонных Provider.</contracts>
+    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK,M-SCHEMA-MIGRATE</depends-on>
   </module>
   <module id="M-AUTH">
     <name>Аутентификация админа</name>
@@ -69,8 +75,8 @@
   <module id="M-SVC-PROBE">
     <name>Сервис циклов замеров → БД</name>
     <path>app/services/probe.py</path>
-    <contracts>Параллель по целям (ThreadPoolExecutor); вызов llm_benchmark.run_probe.</contracts>
-    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK,M-CONFIG</depends-on>
+    <contracts>Диспетчер по probe_kind: chat → core.run_probe; embedding/rerank/audio → non_chat_probes; task_config_json.</contracts>
+    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK,M-LLM-BENCHMARK-EXTRA,M-CONFIG</depends-on>
   </module>
   <module id="M-SVC-EXPORT">
     <name>Экспорт замеров в Excel</name>
@@ -87,7 +93,13 @@
   <module id="M-LLM-BENCHMARK">
     <name>Ядро замера latency/throughput</name>
     <path>llm_benchmark/core.py</path>
-    <contracts>OpenAI-compatible chat.completions; стрим и не-стрим; логирование тела запроса в access log.</contracts>
+    <contracts>chat.completions; стрим и не-стрим; лог в access log.</contracts>
     <depends-on/>
+  </module>
+  <module id="M-LLM-BENCHMARK-EXTRA">
+    <name>Нечатовые замеры</name>
+    <path>llm_benchmark/non_chat_probes.py</path>
+    <contracts>embeddings.create; httpx rerank; audio.transcriptions + синтетический WAV.</contracts>
+    <depends-on>M-LLM-BENCHMARK</depends-on>
   </module>
 </development-plan>

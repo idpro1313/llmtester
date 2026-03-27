@@ -18,7 +18,20 @@ from app.access_logging import access_http_logger
 from app.crypto_util import decrypt_secret
 from app.db import get_session_local
 from app.models import GlobalSettings, Measurement, MonitoredTarget, Provider
-from llm_benchmark.core import run_probe
+from app.probe_kinds import (
+    PROBE_KIND_AUDIO_TRANSCRIPTION,
+    PROBE_KIND_CHAT,
+    PROBE_KIND_EMBEDDING,
+    PROBE_KIND_RERANK,
+    normalize_probe_kind,
+)
+from app.task_config import TaskConfigError, parse_and_sanitize_task_config
+from llm_benchmark.core import run_probe as run_chat_probe
+from llm_benchmark.non_chat_probes import (
+    run_audio_transcription_probe,
+    run_embedding_probe,
+    run_rerank_probe,
+)
 
 log = logging.getLogger(__name__)
 _http_access = access_http_logger()
@@ -123,31 +136,119 @@ def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
     prompt = gs.benchmark_prompt
     warmup = target.warmup_runs if target.warmup_runs else gs.default_warmup
     timeout = gs.default_timeout
+    kind = normalize_probe_kind(getattr(target, "probe_kind", None) or PROBE_KIND_CHAT)
 
-    metrics_list, batch_id = run_probe(
-        prov.base_url.rstrip("/"),
-        api_key,
-        target.model_name,
-        prompt,
-        max_tokens=target.max_tokens,
-        temperature=target.temperature,
-        timeout=timeout,
-        stream=target.use_stream,
-        runs=target.runs_per_probe,
-        warmup=warmup,
-    )
+    try:
+        cfg = parse_and_sanitize_task_config(getattr(target, "task_config_json", None))
+    except TaskConfigError as e:
+        log.warning("Цель %s: некорректный task_config_json: %s", target.id, e)
+        cfg = {}
+
+    base = prov.base_url.rstrip("/")
+    model = target.model_name
+
+    if kind == PROBE_KIND_CHAT:
+        metrics_list, batch_id = run_chat_probe(
+            base,
+            api_key,
+            model,
+            prompt,
+            max_tokens=target.max_tokens,
+            temperature=target.temperature,
+            timeout=timeout,
+            stream=target.use_stream,
+            runs=target.runs_per_probe,
+            warmup=warmup,
+        )
+        api_note = "chat.completions"
+    elif kind == PROBE_KIND_EMBEDDING:
+        input_text = (cfg.get("embedding_input") or "").strip() or (prompt or "").strip()
+        if not input_text:
+            _http_access.info(
+                "probe | skip target_id=%s kind=embedding reason=empty_input",
+                target.id,
+            )
+            return []
+        metrics_list, batch_id = run_embedding_probe(
+            base,
+            api_key,
+            model,
+            input_text,
+            timeout=timeout,
+            runs=target.runs_per_probe,
+            warmup=warmup,
+        )
+        api_note = "embeddings.create"
+    elif kind == PROBE_KIND_RERANK:
+        query = (cfg.get("rerank_query") or "").strip()
+        documents = cfg.get("rerank_documents") or []
+        if not isinstance(documents, list):
+            documents = []
+        if not query or not documents:
+            _http_access.info(
+                "probe | skip target_id=%s kind=rerank reason=missing_query_or_documents",
+                target.id,
+            )
+            return []
+        top_n = int(cfg.get("rerank_top_n", 5))
+        rpath = str(cfg.get("rerank_path", "/rerank") or "/rerank")
+        metrics_list, batch_id = run_rerank_probe(
+            base,
+            api_key,
+            model,
+            query=query,
+            documents=documents,
+            top_n=top_n,
+            rerank_path=rpath,
+            timeout=timeout,
+            runs=target.runs_per_probe,
+            warmup=warmup,
+        )
+        api_note = "rerank http"
+    elif kind == PROBE_KIND_AUDIO_TRANSCRIPTION:
+        dur = float(cfg.get("audio_duration_s", 0.5))
+        lang = cfg.get("audio_language")
+        metrics_list, batch_id = run_audio_transcription_probe(
+            base,
+            api_key,
+            model,
+            duration_s=dur,
+            language=str(lang).strip() if lang else None,
+            timeout=timeout,
+            runs=target.runs_per_probe,
+            warmup=warmup,
+        )
+        api_note = "audio.transcriptions"
+    else:
+        log.warning("Неизвестный probe_kind %r у цели %s — замер как chat", kind, target.id)
+        metrics_list, batch_id = run_chat_probe(
+            base,
+            api_key,
+            model,
+            prompt,
+            max_tokens=target.max_tokens,
+            temperature=target.temperature,
+            timeout=timeout,
+            stream=target.use_stream,
+            runs=target.runs_per_probe,
+            warmup=warmup,
+        )
+        api_note = "chat.completions (fallback)"
+
     ok_n = sum(1 for m in metrics_list if m.success)
     _http_access.info(
-        "probe | target_id=%s model=%s batch=%s provider=%s stream=%s "
-        "runs=%s ok=%s base_url=%s (исходящие вызовы chat к провайдеру в этом цикле)",
+        "probe | target_id=%s kind=%s model=%s batch=%s provider=%s stream=%s "
+        "runs=%s ok=%s base_url=%s (%s)",
         target.id,
-        target.model_name,
+        kind,
+        model,
         batch_id,
         prov.slug,
-        target.use_stream,
+        target.use_stream if kind == PROBE_KIND_CHAT else False,
         len(metrics_list),
         ok_n,
-        prov.base_url.rstrip("/"),
+        base,
+        api_note,
     )
 
     rows: list[Measurement] = []
@@ -155,6 +256,7 @@ def run_target_probe(db: Session, target: MonitoredTarget) -> list[Measurement]:
     for idx, m in enumerate(metrics_list):
         row = Measurement(
             target_id=target.id,
+            probe_kind=kind,
             batch_id=batch_id,
             run_index=idx,
             created_at=now,

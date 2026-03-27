@@ -16,11 +16,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.datetime_util import iso_utc_z
 from app.models import Measurement, MonitoredTarget, Provider
+from app.probe_kinds import PROBE_KIND_LABELS_RU
 
 _ALL_HEADERS = [
     "id",
     "Время (UTC, ISO)",
     "Провайдер",
+    "Тип замера",
     "Модель",
     "target_id",
     "batch_id",
@@ -59,10 +61,12 @@ def _load_rows(db: Session, *, hours: int, target_id: int | None) -> list[Measur
 def _row_cells(m: Measurement) -> list[object]:
     t = m.target
     p = t.provider
+    pk = getattr(m, "probe_kind", None) or "chat"
     return [
         m.id,
         iso_utc_z(m.created_at),
         p.display_name,
+        PROBE_KIND_LABELS_RU.get(pk, pk),
         t.model_name,
         t.id,
         m.batch_id,

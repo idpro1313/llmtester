@@ -69,6 +69,7 @@
     <thead>
       <tr>
         <th title="Цель мониторинга">Цель</th>
+        <th title="Тип замера (чат / эмбеддинг / реранк / аудио)">Тип</th>
         <th title="Всего записей">N</th>
         <th title="Доля ошибок">Err %</th>
         <th title="TTFT, с">TTFT</th>
@@ -305,6 +306,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML =
         '<td>' + escHtml(t.label) + '</td>' +
+        '<td>' + escHtml(t.probe_kind_label || t.probe_kind || '—') + '</td>' +
         '<td>' + t.samples + '</td>' +
         '<td>' + (100 * t.error_rate).toFixed(1) + '</td>' +
         '<td>' + fmtPair(t.ttft_s, 3) + '</td>' +
@@ -342,7 +344,12 @@
         const msg = (p.error_message || '—').slice(0, 800);
         tr.innerHTML =
           '<td>' + escHtml(formatDisplayTime(p.t)) + '</td>' +
-          '<td>' + escHtml(p.label) + '</td>' +
+          '<td>' +
+          escHtml(p.label) +
+          (p.probe_kind_label
+            ? ' <span class="muted">(' + escHtml(p.probe_kind_label) + ')</span>'
+            : '') +
+          '</td>' +
           '<td>' + (p.http_status != null ? p.http_status : '—') + '</td>' +
           '<td class="err-cell">' + escHtml(msg) + '</td>';
         failTb.appendChild(tr);

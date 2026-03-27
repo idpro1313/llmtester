@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 # GRACE[M-BOOT][PERSIST][BLOCK_SchemaSeed]
-# CONTRACT: ensure_schema (create_all), seed_if_empty — GlobalSettings и шаблонные Provider.
+# CONTRACT: ensure_schema (create_all + migrate_engine), seed_if_empty — GlobalSettings и шаблонные Provider.
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import Base, get_engine
 from app.models import GlobalSettings, Provider
+from app.schema_migrate import migrate_engine
 from llm_benchmark.core import DEFAULT_PROMPT
 
 
 def ensure_schema() -> None:
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    migrate_engine(engine)
 
 
 def seed_if_empty(db: Session) -> None:

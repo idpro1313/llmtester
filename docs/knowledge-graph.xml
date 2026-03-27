@@ -6,6 +6,9 @@
     <file path="app/db.py" module="M-DB"/>
     <file path="app/models.py" module="M-DATA"/>
     <file path="app/bootstrap.py" module="M-BOOT"/>
+    <file path="app/schema_migrate.py" module="M-SCHEMA-MIGRATE"/>
+    <file path="app/probe_kinds.py" module="M-SVC-PROBE"/>
+    <file path="app/task_config.py" module="M-SVC-PROBE"/>
     <file path="app/auth.py" module="M-AUTH"/>
     <file path="app/scheduler.py" module="M-SCHEDULER"/>
     <file path="app/routers/pages.py" module="M-PAGES"/>
@@ -16,6 +19,7 @@
     <file path="app/services/metrics_export.py" module="M-SVC-EXPORT"/>
     <file path="app/services/openai_models.py" module="M-SVC-OPENAI-MODELS"/>
     <file path="llm_benchmark/core.py" module="M-LLM-BENCHMARK"/>
+    <file path="llm_benchmark/non_chat_probes.py" module="M-LLM-BENCHMARK-EXTRA"/>
     <file path="llm_benchmark/__init__.py" module="M-LLM-BENCHMARK"/>
     <file path="benchmark.py" module="M-LLM-BENCHMARK" role="cli_entry"/>
     <file path="app/version_info.py" module="M-APP" role="version"/>
@@ -35,7 +39,9 @@
     <edge from="app/main.py" to="app/routers/api_metrics.py" relation="includes_router" note="prefix /api"/>
     <edge from="app/main.py" to="app/routers/api_providers.py" relation="includes_router" note="prefix /api"/>
     <edge from="app/main.py" to="app/routers/api_scheduler.py" relation="includes_router" note="prefix /api"/>
-    <edge from="app/services/probe.py" to="llm_benchmark/core.py" relation="calls_run_probe"/>
+    <edge from="app/bootstrap.py" to="app/schema_migrate.py" relation="migrate_engine"/>
+    <edge from="app/services/probe.py" to="llm_benchmark/core.py" relation="run_chat_probe"/>
+    <edge from="app/services/probe.py" to="llm_benchmark/non_chat_probes.py" relation="embedding_rerank_audio"/>
     <edge from="app/scheduler.py" to="app/services/probe.py" relation="run_all_enabled_probes"/>
     <edge from="app/routers/api_metrics.py" to="app/services/metrics_export.py" relation="export_xlsx"/>
     <edge from="app/routers/api_providers.py" to="app/services/openai_models.py" relation="list_models"/>

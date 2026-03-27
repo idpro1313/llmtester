@@ -6,7 +6,7 @@
   <scenarios>
     <scenario id="S-SETUP">Первичная настройка: создание учётной записи админа (/setup).</scenario>
     <scenario id="S-PROVIDERS">Управление провайдерами OpenAI-compatible: base URL, ключ (шифрование Fernet в БД).</scenario>
-    <scenario id="S-TARGETS">Цели мониторинга: модель, параметры вызова, прогрев, число прогонов.</scenario>
+    <scenario id="S-TARGETS">Цели мониторинга: тип замера (чат, эмбеддинг, реранк, аудио→текст), модель, JSON task_config при необходимости, параметры чата, прогрев, число прогонов.</scenario>
     <scenario id="S-SCHEDULER">Периодические замеры по интервалу из global_settings; пауза/старт через API.</scenario>
     <scenario id="S-DASHBOARD">Дашборд: графики, сводка, экспорт Excel, очистка замеров, ручной запуск цикла.</scenario>
     <scenario id="S-LOGS">Просмотр хвоста requests.log (/admin/logs).</scenario>

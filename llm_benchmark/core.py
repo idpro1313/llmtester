@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # GRACE[M-LLM-BENCHMARK][INTEGRATION][BLOCK_RunProbe]
-# CONTRACT: run_probe / chat.completions; max_retries=0; лог тела запроса в app.http_access.
+# CONTRACT: run_probe — только chat.completions; max_retries=0; лог тела в app.http_access; прочие типы — non_chat_probes.
 
 import json
 import logging

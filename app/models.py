@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # GRACE[M-DATA][ORM][BLOCK_Entities]
-# CONTRACT: AdminUser, GlobalSettings, AppCryptoState, Provider, MonitoredTarget, Measurement.
+# CONTRACT: AdminUser, GlobalSettings, AppCryptoState, Provider, MonitoredTarget (probe_kind, task_config_json), Measurement (probe_kind).
 
 from datetime import datetime
 
@@ -63,6 +63,10 @@ class MonitoredTarget(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider_id: Mapped[int] = mapped_column(ForeignKey("providers.id", ondelete="CASCADE"), nullable=False)
     model_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    """Тип замера: chat | embedding | rerank | audio_transcription (см. app.probe_kinds)."""
+    probe_kind: Mapped[str] = mapped_column(String(32), default="chat", nullable=False)
+    """JSON: embedding_input, rerank_query, rerank_documents, rerank_top_n, rerank_path, audio_duration_s, audio_language."""
+    task_config_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     max_tokens: Mapped[int] = mapped_column(Integer, default=512, nullable=False)
     temperature: Mapped[float] = mapped_column(Float, default=0.2, nullable=False)
@@ -81,6 +85,7 @@ class Measurement(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     target_id: Mapped[int] = mapped_column(ForeignKey("monitored_targets.id", ondelete="CASCADE"), nullable=False)
+    probe_kind: Mapped[str] = mapped_column(String(32), default="chat", nullable=False)
     batch_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     run_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)

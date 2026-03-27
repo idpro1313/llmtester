@@ -16,6 +16,7 @@ from app.auth import require_admin
 from app.datetime_util import iso_utc_z
 from app.db import get_db
 from app.models import AdminUser, Measurement, MonitoredTarget, Provider
+from app.probe_kinds import PROBE_KIND_LABELS_RU
 from app.services.metrics_export import measurements_to_xlsx_bytes
 
 router = APIRouter(tags=["api"])
@@ -53,7 +54,10 @@ def metrics_series(
     for m in rows:
         t = m.target
         p = t.provider
+        pk = getattr(m, "probe_kind", None) or "chat"
         label = f"{p.display_name} / {t.model_name}"
+        if pk != "chat":
+            label = f"{label} ({PROBE_KIND_LABELS_RU.get(pk, pk)})"
         points.append(
             {
                 "t": iso_utc_z(m.created_at),
@@ -62,6 +66,8 @@ def metrics_series(
                 "batch_id": m.batch_id,
                 "run_index": m.run_index,
                 "label": label,
+                "probe_kind": pk,
+                "probe_kind_label": PROBE_KIND_LABELS_RU.get(pk, pk),
                 "provider_slug": p.slug,
                 "success": m.success,
                 "error_message": m.error_message,
@@ -160,10 +166,13 @@ def metrics_summary(
         )
         stream_share = (sum(1 for m in ok if m.stream) / len(ok)) if ok else None
 
+        pk0 = getattr(ms[0], "probe_kind", None) or "chat"
         summaries.append(
             {
                 "target_id": tid,
                 "label": f"{p.display_name} / {t.model_name}",
+                "probe_kind": pk0,
+                "probe_kind_label": PROBE_KIND_LABELS_RU.get(pk0, pk0),
                 "provider_slug": p.slug,
                 "samples": len(ms),
                 "success_count": len(ok),
@@ -202,7 +211,10 @@ def targets_options(
         "targets": [
             {
                 "id": t.id,
-                "label": f"{t.provider.display_name} — {t.model_name}",
+                "label": (
+                    f"{t.provider.display_name} — {t.model_name} "
+                    f"({PROBE_KIND_LABELS_RU.get(t.probe_kind or 'chat', t.probe_kind or 'chat')})"
+                ),
             }
             for t in rows
         ]

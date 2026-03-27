@@ -20,7 +20,13 @@ from app.crypto_util import encrypt_secret
 from app.db import get_db
 from app.log_reader import log_file_path, read_requests_log_tail
 from app.models import AdminUser, GlobalSettings, Measurement, MonitoredTarget, Provider
+from app.probe_kinds import (
+    PROBE_KIND_LABELS_RU,
+    normalize_probe_kind,
+    probe_kind_choices,
+)
 from app.services.probe import run_all_enabled_probes_in_background
+from app.task_config import TaskConfigError, parse_and_sanitize_task_config, task_config_json_dumps
 from app.version_info import get_version
 
 _TPL = Path(__file__).resolve().parent.parent / "templates"
@@ -227,7 +233,14 @@ def admin_targets(request: Request, db: Annotated[Session, Depends(get_db)]):
         .order_by(Provider.sort_order, MonitoredTarget.id)
     ).unique().all()
     qmsg = request.query_params.get("msg", "")
-    return _tpl(request, "targets.html", user=u, targets=rows, msg=qmsg)
+    return _tpl(
+        request,
+        "targets.html",
+        user=u,
+        targets=rows,
+        msg=qmsg,
+        probe_kind_labels=PROBE_KIND_LABELS_RU,
+    )
 
 
 @router.get("/admin/targets/new")
@@ -241,6 +254,8 @@ def admin_target_new(request: Request, db: Annotated[Session, Depends(get_db)]):
     t = MonitoredTarget(
         provider_id=providers[0].id,
         model_name="",
+        probe_kind="chat",
+        task_config_json="{}",
         enabled=True,
         max_tokens=512,
         temperature=0.2,
@@ -249,7 +264,15 @@ def admin_target_new(request: Request, db: Annotated[Session, Depends(get_db)]):
         warmup_runs=0,
     )
     setattr(t, "_virtual_new", True)
-    return _tpl(request, "target_edit.html", user=u, target=t, providers=providers, is_new=True)
+    return _tpl(
+        request,
+        "target_edit.html",
+        user=u,
+        target=t,
+        providers=providers,
+        is_new=True,
+        probe_kind_choices=probe_kind_choices(),
+    )
 
 
 @router.get("/admin/targets/{tid}")
@@ -261,7 +284,15 @@ def admin_target_edit(request: Request, db: Annotated[Session, Depends(get_db)],
     if t is None:
         raise HTTPException(404)
     providers = db.scalars(select(Provider).order_by(Provider.sort_order)).all()
-    return _tpl(request, "target_edit.html", user=u, target=t, providers=providers, is_new=False)
+    return _tpl(
+        request,
+        "target_edit.html",
+        user=u,
+        target=t,
+        providers=providers,
+        is_new=False,
+        probe_kind_choices=probe_kind_choices(),
+    )
 
 
 @router.post("/admin/targets/new")
@@ -270,6 +301,8 @@ def admin_target_create(
     db: Annotated[Session, Depends(get_db)],
     provider_id: int = Form(...),
     model_name: str = Form(...),
+    probe_kind: str = Form("chat"),
+    task_config_json: str = Form("{}"),
     enabled: str = Form("0"),
     max_tokens: int = Form(512),
     temperature: float = Form(0.2),
@@ -280,9 +313,41 @@ def admin_target_create(
     u = _need_user(request, db)
     if isinstance(u, RedirectResponse):
         return u
+    providers = db.scalars(select(Provider).order_by(Provider.sort_order)).all()
+    tc_raw = (task_config_json or "").strip() or "{}"
+    try:
+        cfg = parse_and_sanitize_task_config(tc_raw)
+    except TaskConfigError as e:
+        t = MonitoredTarget(
+            provider_id=provider_id,
+            model_name=model_name.strip(),
+            probe_kind=normalize_probe_kind(probe_kind),
+            task_config_json=tc_raw,
+            enabled=enabled in ("1", "on", "true", "yes"),
+            max_tokens=max_tokens,
+            temperature=temperature,
+            use_stream=use_stream in ("1", "on", "true", "yes"),
+            runs_per_probe=max(1, runs_per_probe),
+            warmup_runs=max(0, warmup_runs),
+        )
+        setattr(t, "_virtual_new", True)
+        return _tpl(
+            request,
+            "target_edit.html",
+            user=u,
+            target=t,
+            providers=providers,
+            is_new=True,
+            probe_kind_choices=probe_kind_choices(),
+            form_error=str(e),
+            status_code=400,
+        )
+    kind = normalize_probe_kind(probe_kind)
     t = MonitoredTarget(
         provider_id=provider_id,
         model_name=model_name.strip(),
+        probe_kind=kind,
+        task_config_json=task_config_json_dumps(cfg),
         enabled=enabled in ("1", "on", "true", "yes"),
         max_tokens=max_tokens,
         temperature=temperature,
@@ -302,6 +367,8 @@ def admin_target_save(
     tid: int,
     provider_id: int = Form(...),
     model_name: str = Form(...),
+    probe_kind: str = Form("chat"),
+    task_config_json: str = Form("{}"),
     enabled: str = Form("0"),
     max_tokens: int = Form(512),
     temperature: float = Form(0.2),
@@ -315,8 +382,36 @@ def admin_target_save(
     t = db.get(MonitoredTarget, tid)
     if t is None:
         raise HTTPException(404)
+    providers = db.scalars(select(Provider).order_by(Provider.sort_order)).all()
+    tc_raw = (task_config_json or "").strip() or "{}"
+    try:
+        cfg = parse_and_sanitize_task_config(tc_raw)
+    except TaskConfigError as e:
+        t.provider_id = provider_id
+        t.model_name = model_name.strip()
+        t.probe_kind = normalize_probe_kind(probe_kind)
+        t.task_config_json = tc_raw
+        t.enabled = enabled in ("1", "on", "true", "yes")
+        t.max_tokens = max_tokens
+        t.temperature = temperature
+        t.use_stream = use_stream in ("1", "on", "true", "yes")
+        t.runs_per_probe = max(1, runs_per_probe)
+        t.warmup_runs = max(0, warmup_runs)
+        return _tpl(
+            request,
+            "target_edit.html",
+            user=u,
+            target=t,
+            providers=providers,
+            is_new=False,
+            probe_kind_choices=probe_kind_choices(),
+            form_error=str(e),
+            status_code=400,
+        )
     t.provider_id = provider_id
     t.model_name = model_name.strip()
+    t.probe_kind = normalize_probe_kind(probe_kind)
+    t.task_config_json = task_config_json_dumps(cfg)
     t.enabled = enabled in ("1", "on", "true", "yes")
     t.max_tokens = max_tokens
     t.temperature = temperature
