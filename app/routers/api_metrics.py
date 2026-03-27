@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -12,6 +13,7 @@ from app.auth import require_admin
 from app.datetime_util import iso_utc_z
 from app.db import get_db
 from app.models import AdminUser, Measurement, MonitoredTarget, Provider
+from app.services.metrics_export import measurements_to_xlsx_bytes
 
 router = APIRouter(tags=["api"])
 
@@ -76,6 +78,25 @@ def metrics_series(
             }
         )
     return {"points": points}
+
+
+@router.get("/metrics/export")
+def metrics_export_xlsx(
+    db: Annotated[Session, Depends(get_db)],
+    _user: Annotated[AdminUser, Depends(require_admin)],
+    hours: int = Query(24, ge=1, le=168),
+    target_id: int | None = None,
+) -> Response:
+    """Скачивание .xlsx: лист «Замеры» (все строки окна) и «Ошибки» (только неуспешные)."""
+    body = measurements_to_xlsx_bytes(db, hours=hours, target_id=target_id)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+    suffix = f"_target{target_id}" if target_id is not None else ""
+    fname = f"llm_probes_h{hours}{suffix}_{stamp}.xlsx"
+    return Response(
+        content=body,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/metrics/summary")

@@ -46,6 +46,7 @@
     </select>
   </label>
   <button type="button" id="refreshBtn">Обновить</button>
+  <button type="button" class="secondary" id="exportXlsxBtn" title="Файл .xlsx по текущему окну (часы) и фильтру цели">Скачать Excel</button>
 </section>
 
 <section class="charts" aria-label="Графики метрик">
@@ -340,7 +341,7 @@
         const tr = document.createElement('tr');
         const msg = (p.error_message || '—').slice(0, 800);
         tr.innerHTML =
-          '<td>' + escHtml(new Date(p.t).toLocaleString()) + '</td>' +
+          '<td>' + escHtml(formatDisplayTime(p.t)) + '</td>' +
           '<td>' + escHtml(p.label) + '</td>' +
           '<td>' + (p.http_status != null ? p.http_status : '—') + '</td>' +
           '<td class="err-cell">' + escHtml(msg) + '</td>';
@@ -350,6 +351,13 @@
   }
 
   document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('exportXlsxBtn').addEventListener('click', function () {
+    const hours = document.getElementById('hours').value || 24;
+    const tid = document.getElementById('targetFilter').value;
+    let url = '/api/metrics/export?hours=' + encodeURIComponent(hours);
+    if (tid) url += '&target_id=' + encodeURIComponent(tid);
+    window.location.assign(url);
+  });
   document.getElementById('hours').addEventListener('change', refresh);
   document.getElementById('targetFilter').addEventListener('change', refresh);
 
