@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# GRACE[M-SVC-OPENAI-MODELS][INTEGRATION][BLOCK_ModelsList]
+# CONTRACT: list_model_ids(base_url, api_key); httpx таймауты; логирование через ACCESS_LOGGER_NAME.
+
 import logging
 import time
 

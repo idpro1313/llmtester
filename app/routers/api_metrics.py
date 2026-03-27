@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-API-METRICS][HTTP][BLOCK_MetricsAPI]
+# CONTRACT: /metrics/series, summary, export — только с require_admin; UTC Z в JSON.
+
 import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any

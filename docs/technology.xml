@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GRACE 3.x: стек и формат семантической разметки в коде -->
+<technology version="1.0" project="llmtester">
+  <stack>
+    <backend language="python" framework="FastAPI" asgi="uvicorn"/>
+    <orm>SQLAlchemy 2.x</orm>
+    <db default="sqlite">SQLite (docker: ./data/monitor.db)</db>
+    <scheduler>APScheduler (background)</scheduler>
+    <llm_client>OpenAI Python SDK (OpenAI-compatible endpoints)</llm_client>
+    <templates>Jinja2</templates>
+    <export>openpyxl (xlsx)</export>
+  </stack>
+  <testing>
+    <note>Автотесты в репозитории не заявлены; гейты — ручной смоук по verification-plan.xml.</note>
+  </testing>
+  <logging>
+    <access_log>data/requests.log (ротация); дублирование в stdout в Docker</access_log>
+  </logging>
+  <semantic-markup>
+    <python>
+      <line>Формат: # GRACE[M-&lt;MODULE&gt;][&lt;LAYER&gt;][BLOCK_&lt;NAME&gt;]</line>
+      <line>Контракт публичного поведения: # CONTRACT: &lt;кратко&gt;</line>
+      <line>Якорь размещается в начале модуля (после docstring, если есть).</line>
+    </python>
+    <html_templates>
+      <note>Шаблоны Jinja2 без @grace; граница UI трассируется через M-PAGES и knowledge-graph.</note>
+    </html_templates>
+  </semantic-markup>
+</technology>

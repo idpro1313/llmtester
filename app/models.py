@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-DATA][ORM][BLOCK_Entities]
+# CONTRACT: AdminUser, GlobalSettings, AppCryptoState, Provider, MonitoredTarget, Measurement.
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text

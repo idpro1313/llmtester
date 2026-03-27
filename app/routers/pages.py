@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-PAGES][HTTP][BLOCK_UIRouter]
+# CONTRACT: Jinja2-страницы, setup/login, dashboard, admin; GET /health + version.
+
 import logging
 from pathlib import Path
 from typing import Annotated, Any

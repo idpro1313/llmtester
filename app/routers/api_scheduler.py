@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-API-SCHEDULER][HTTP][BLOCK_SchedulerAPI]
+# CONTRACT: status, start, stop планировщика замеров; require_admin.
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends

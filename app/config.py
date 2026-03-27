@@ -1,3 +1,6 @@
+# GRACE[M-CONFIG][ENV][BLOCK_Settings]
+# CONTRACT: pydantic-settings без .env; sqlalchemy_url; get_session_secret.
+
 import os
 from functools import lru_cache
 

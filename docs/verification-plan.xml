@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<verification-plan version="1.0" project="llmtester">
+  <gates>
+    <gate id="V-SMOKE-HEALTH" kind="manual">
+      <description>GET /health возвращает JSON с полем version (читает VERSION).</description>
+      <traces>
+        <trace module="M-PAGES">health endpoint</trace>
+      </traces>
+    </gate>
+    <gate id="V-SMOKE-SETUP-LOGIN" kind="manual">
+      <description>На пустой БД открывается /setup; после создания админа — /login и вход в сессию.</description>
+      <traces>
+        <trace module="M-PAGES">setup, login</trace>
+        <trace module="M-AUTH">hash_password, session</trace>
+      </traces>
+    </gate>
+    <gate id="V-SMOKE-API-METRICS" kind="manual">
+      <description>С авторизованной сессией GET /api/metrics/summary?hours=24 отвечает 200.</description>
+      <traces>
+        <trace module="M-API-METRICS">summary</trace>
+        <trace module="M-AUTH">require_admin</trace>
+      </traces>
+    </gate>
+    <gate id="V-SMOKE-SCHEDULER-API" kind="manual">
+      <description>GET /api/scheduler/status после входа отдаёт JSON со статусом job.</description>
+      <traces>
+        <trace module="M-API-SCHEDULER">status</trace>
+        <trace module="M-SCHEDULER">scheduler_status_dict</trace>
+      </traces>
+    </gate>
+  </gates>
+  <notes>
+    <note>Выполнять после деплоя или локально с uvicorn; автоматизация не подключена.</note>
+  </notes>
+</verification-plan>

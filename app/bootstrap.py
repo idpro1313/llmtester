@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# GRACE[M-BOOT][PERSIST][BLOCK_SchemaSeed]
+# CONTRACT: ensure_schema (create_all), seed_if_empty — GlobalSettings и шаблонные Provider.
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

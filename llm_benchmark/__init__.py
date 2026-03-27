@@ -1,5 +1,8 @@
 """Ядро замеров OpenAI-compatible Chat Completions."""
 
+# GRACE[M-LLM-BENCHMARK][PACKAGE][BLOCK_PublicExports]
+# CONTRACT: реэкспорт DEFAULT_PROMPT, run_probe, run_once_*, RunMetrics из core.
+
 from llm_benchmark.core import (
     DEFAULT_PROMPT,
     RunMetrics,

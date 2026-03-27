@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# GRACE[M-SVC-PROBE][DOMAIN][BLOCK_ProbeCycles]
+# CONTRACT: циклы замеров по целям, ThreadPoolExecutor по LLMTESTER_PROBE_PARALLEL; запись Measurement.
+
 import logging
 import os
 import threading

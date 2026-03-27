@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<knowledge-graph version="1.0" project="llmtester">
+  <nodes>
+    <file path="app/main.py" module="M-APP"/>
+    <file path="app/config.py" module="M-CONFIG"/>
+    <file path="app/db.py" module="M-DB"/>
+    <file path="app/models.py" module="M-DATA"/>
+    <file path="app/bootstrap.py" module="M-BOOT"/>
+    <file path="app/auth.py" module="M-AUTH"/>
+    <file path="app/scheduler.py" module="M-SCHEDULER"/>
+    <file path="app/routers/pages.py" module="M-PAGES"/>
+    <file path="app/routers/api_metrics.py" module="M-API-METRICS"/>
+    <file path="app/routers/api_providers.py" module="M-API-PROVIDERS"/>
+    <file path="app/routers/api_scheduler.py" module="M-API-SCHEDULER"/>
+    <file path="app/services/probe.py" module="M-SVC-PROBE"/>
+    <file path="app/services/metrics_export.py" module="M-SVC-EXPORT"/>
+    <file path="app/services/openai_models.py" module="M-SVC-OPENAI-MODELS"/>
+    <file path="llm_benchmark/core.py" module="M-LLM-BENCHMARK"/>
+    <file path="llm_benchmark/__init__.py" module="M-LLM-BENCHMARK"/>
+    <file path="benchmark.py" module="M-LLM-BENCHMARK" role="cli_entry"/>
+    <file path="app/version_info.py" module="M-APP" role="version"/>
+    <file path="app/datetime_util.py" module="M-API-METRICS" role="shared_util"/>
+    <file path="app/crypto_util.py" module="M-AUTH" role="crypto"/>
+    <file path="app/access_logging.py" module="M-APP" role="logging"/>
+    <file path="app/middleware/request_log.py" module="M-APP" role="middleware"/>
+    <file path="app/middleware/body_log.py" module="M-APP" role="middleware"/>
+    <file path="app/log_reader.py" module="M-PAGES" role="logs_ui"/>
+    <file path="app/local_secrets.py" module="M-CONFIG" role="session_secret_file"/>
+    <file path="VERSION" module="M-APP" role="semver_source"/>
+    <directory path="app/templates/" module="M-PAGES" kind="jinja2"/>
+    <directory path="app/static/" module="M-PAGES" kind="static"/>
+  </nodes>
+  <edges>
+    <edge from="app/main.py" to="app/routers/pages.py" relation="includes_router"/>
+    <edge from="app/main.py" to="app/routers/api_metrics.py" relation="includes_router" note="prefix /api"/>
+    <edge from="app/main.py" to="app/routers/api_providers.py" relation="includes_router" note="prefix /api"/>
+    <edge from="app/main.py" to="app/routers/api_scheduler.py" relation="includes_router" note="prefix /api"/>
+    <edge from="app/services/probe.py" to="llm_benchmark/core.py" relation="calls_run_probe"/>
+    <edge from="app/scheduler.py" to="app/services/probe.py" relation="run_all_enabled_probes"/>
+    <edge from="app/routers/api_metrics.py" to="app/services/metrics_export.py" relation="export_xlsx"/>
+    <edge from="app/routers/api_providers.py" to="app/services/openai_models.py" relation="list_models"/>
+    <edge from="app/routers/pages.py" to="app/services/probe.py" relation="manual_probe_background"/>
+    <edge from="app/services/probe.py" to="external:openai_compatible" relation="outbound" note="HTTPS к провайдерам LLM"/>
+  </edges>
+</knowledge-graph>

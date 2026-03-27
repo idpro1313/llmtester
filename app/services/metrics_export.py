@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# GRACE[M-SVC-EXPORT][DOMAIN][BLOCK_XlsxExport]
+# CONTRACT: measurements_to_xlsx_bytes — листы замеров и ошибок.
+
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import Sequence

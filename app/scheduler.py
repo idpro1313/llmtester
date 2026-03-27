@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-SCHEDULER][BACKGROUND][BLOCK_APScheduler]
+# CONTRACT: BackgroundScheduler; интервал из GlobalSettings (мин. 30 с); pause/resume; статус для API/UI.
+
 import logging
 from typing import Any, Optional
 

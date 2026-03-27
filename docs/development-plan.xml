@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<development-plan version="1.0" project="llmtester">
+  <module id="M-APP">
+    <name>Сборка FastAPI-приложения</name>
+    <path>app/main.py</path>
+    <contracts>lifespan: схема БД, сиды, Fernet, старт планировщика; роутеры и /static.</contracts>
+    <depends-on>M-CONFIG,M-DB,M-BOOT,M-SCHEDULER,M-PAGES,M-API-METRICS,M-API-PROVIDERS,M-API-SCHEDULER</depends-on>
+  </module>
+  <module id="M-CONFIG">
+    <name>Настройки окружения</name>
+    <path>app/config.py</path>
+    <contracts>DATABASE_URL, FERNET_KEY; секрет сессии через env или файл в data.</contracts>
+    <depends-on/>
+  </module>
+  <module id="M-DB">
+    <name>Движок SQLAlchemy и сессии</name>
+    <path>app/db.py</path>
+    <contracts>get_db dependency; SQLite check_same_thread=false для потоков замеров.</contracts>
+    <depends-on>M-CONFIG</depends-on>
+  </module>
+  <module id="M-DATA">
+    <name>ORM-модели</name>
+    <path>app/models.py</path>
+    <contracts>Сущности admin_users, global_settings, providers, monitored_targets, measurements, app_crypto_state.</contracts>
+    <depends-on>M-DB</depends-on>
+  </module>
+  <module id="M-BOOT">
+    <name>Схема и начальные данные</name>
+    <path>app/bootstrap.py</path>
+    <contracts>create_all; сид GlobalSettings и шаблонных Provider.</contracts>
+    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK</depends-on>
+  </module>
+  <module id="M-AUTH">
+    <name>Аутентификация админа</name>
+    <path>app/auth.py</path>
+    <contracts>bcrypt; require_admin для /api; session cookie.</contracts>
+    <depends-on>M-DB,M-DATA</depends-on>
+  </module>
+  <module id="M-SCHEDULER">
+    <name>Планировщик APScheduler</name>
+    <path>app/scheduler.py</path>
+    <contracts>Интервал из БД (мин. 30 с); pause/resume; статус для UI.</contracts>
+    <depends-on>M-DB,M-DATA,M-SVC-PROBE</depends-on>
+  </module>
+  <module id="M-PAGES">
+    <name>HTML-страницы (Jinja2)</name>
+    <path>app/routers/pages.py</path>
+    <contracts>login, setup, dashboard, admin, /health с version.</contracts>
+    <depends-on>M-AUTH,M-DATA,M-SVC-PROBE,M-CONFIG</depends-on>
+  </module>
+  <module id="M-API-METRICS">
+    <name>REST API метрик и экспорт</name>
+    <path>app/routers/api_metrics.py</path>
+    <contracts>series, summary, export xlsx; требуют admin.</contracts>
+    <depends-on>M-AUTH,M-DATA,M-SVC-EXPORT</depends-on>
+  </module>
+  <module id="M-API-PROVIDERS">
+    <name>REST API провайдеров</name>
+    <path>app/routers/api_providers.py</path>
+    <contracts>GET /providers/{id}/models — upstream OpenAI-compatible.</contracts>
+    <depends-on>M-AUTH,M-DATA,M-SVC-OPENAI-MODELS</depends-on>
+  </module>
+  <module id="M-API-SCHEDULER">
+    <name>REST API планировщика</name>
+    <path>app/routers/api_scheduler.py</path>
+    <contracts>status, start, stop.</contracts>
+    <depends-on>M-AUTH,M-SCHEDULER,M-DB</depends-on>
+  </module>
+  <module id="M-SVC-PROBE">
+    <name>Сервис циклов замеров → БД</name>
+    <path>app/services/probe.py</path>
+    <contracts>Параллель по целям (ThreadPoolExecutor); вызов llm_benchmark.run_probe.</contracts>
+    <depends-on>M-DB,M-DATA,M-LLM-BENCHMARK,M-CONFIG</depends-on>
+  </module>
+  <module id="M-SVC-EXPORT">
+    <name>Экспорт замеров в Excel</name>
+    <path>app/services/metrics_export.py</path>
+    <contracts>measurements_to_xlsx_bytes</contracts>
+    <depends-on>M-DATA</depends-on>
+  </module>
+  <module id="M-SVC-OPENAI-MODELS">
+    <name>Список моделей upstream</name>
+    <path>app/services/openai_models.py</path>
+    <contracts>list_model_ids; httpx таймауты.</contracts>
+    <depends-on/>
+  </module>
+  <module id="M-LLM-BENCHMARK">
+    <name>Ядро замера latency/throughput</name>
+    <path>llm_benchmark/core.py</path>
+    <contracts>OpenAI-compatible chat.completions; стрим и не-стрим; логирование тела запроса в access log.</contracts>
+    <depends-on/>
+  </module>
+</development-plan>

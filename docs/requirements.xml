@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<requirements version="1.0" project="llmtester">
+  <actors>
+    <actor id="admin">Администратор (сессия после /login)</actor>
+  </actors>
+  <scenarios>
+    <scenario id="S-SETUP">Первичная настройка: создание учётной записи админа (/setup).</scenario>
+    <scenario id="S-PROVIDERS">Управление провайдерами OpenAI-compatible: base URL, ключ (шифрование Fernet в БД).</scenario>
+    <scenario id="S-TARGETS">Цели мониторинга: модель, параметры вызова, прогрев, число прогонов.</scenario>
+    <scenario id="S-SCHEDULER">Периодические замеры по интервалу из global_settings; пауза/старт через API.</scenario>
+    <scenario id="S-DASHBOARD">Дашборд: графики, сводка, экспорт Excel, очистка замеров, ручной запуск цикла.</scenario>
+    <scenario id="S-LOGS">Просмотр хвоста requests.log (/admin/logs).</scenario>
+    <scenario id="S-CLI">CLI benchmark.py → пакет llm_benchmark (вне веб-UI).</scenario>
+  </scenarios>
+  <constraints>
+    <constraint>Каталог data/ с БД и секретами не коммитится; промпт в upstream-логах может быть конфиденциален.</constraint>
+    <constraint>Исходящие chat/completions: max_retries=0 у клиента (нет автоповторов SDK).</constraint>
+  </constraints>
+</requirements>

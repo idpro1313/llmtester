@@ -1,3 +1,6 @@
+# GRACE[M-DB][PERSIST][BLOCK_Session]
+# CONTRACT: SQLAlchemy engine/sessionmaker; get_db для FastAPI Depends; SQLite — потоки замеров.
+
 from collections.abc import Generator
 
 from sqlalchemy import create_engine

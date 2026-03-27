@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-API-PROVIDERS][HTTP][BLOCK_ProvidersAPI]
+# CONTRACT: GET /providers/{id}/models — OpenAI-compatible upstream; require_admin.
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException

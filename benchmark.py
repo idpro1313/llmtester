@@ -6,6 +6,9 @@ CLI: бенчмарк скорости LLM через OpenAI-compatible Chat Com
 
 from __future__ import annotations
 
+# GRACE[M-LLM-BENCHMARK][CLI][BLOCK_BenchmarkScript]
+# CONTRACT: точка входа CLI; вызывает пакет llm_benchmark.
+
 import argparse
 import json
 import os

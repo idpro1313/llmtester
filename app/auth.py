@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-AUTH][SECURITY][BLOCK_AdminSession]
+# CONTRACT: bcrypt; login_user; require_admin / session_admin_user для UI и API.
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request

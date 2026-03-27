@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# GRACE[M-APP][ASGI][BLOCK_AppFactory]
+# CONTRACT: create_app() — FastAPI, middleware, роутеры pages + /api/*, /static; lifespan — схема БД, сиды, Fernet, планировщик.
+
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
