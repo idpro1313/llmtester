@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block title %}Графики метрик — LLM Monitor{% endblock %}
+{% block main_class %} charts-wide{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Графики метрик</h1>
+<p class="muted charts-page-intro">
+  Крупный вид, одна колонка, легенда справа. Параметры окна совпадают с <a href="/dashboard">дашбордом</a> (можно открыть обе вкладки).
+</p>
+
+<section class="controls charts-controls">
+  <label>Окно (часы) <input type="number" id="hours" value="24" min="1" max="168" /></label>
+  <label>Цель
+    <select id="targetFilter">
+      <option value="">Все</option>
+    </select>
+  </label>
+  <button type="button" id="refreshBtn">Обновить</button>
+  <button type="button" class="secondary" id="exportXlsxBtn" title="Файл .xlsx по текущему окну и фильтру цели">Скачать Excel</button>
+</section>
+
+<details class="metric-legend">
+  <summary>Справка: что означают метрики на графиках</summary>
+  <div class="metric-legend-inner">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-metric">Метрика</th>
+          <th>Что показывает</th>
+          <th class="col-dir">Как интерпретировать</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>TTFT</td>
+          <td>Время до <strong>первого фрагмента текста</strong> в стриминговом чате.</td>
+          <td class="col-dir prefer-lower">Меньше — лучше</td>
+        </tr>
+        <tr>
+          <td>Total</td>
+          <td>Полная длительность одного вызова API.</td>
+          <td class="col-dir prefer-lower">Меньше — лучше</td>
+        </tr>
+        <tr>
+          <td>e2e t/s</td>
+          <td>Токены выхода в секунду за полный цикл запроса.</td>
+          <td class="col-dir prefer-higher">Больше — лучше</td>
+        </tr>
+        <tr>
+          <td>gen t/s</td>
+          <td>Скорость генерации <strong>после первого токена</strong> (стрим).</td>
+          <td class="col-dir prefer-higher">Больше — лучше</td>
+        </tr>
+        <tr>
+          <td>prompt / compl / chars</td>
+          <td>Токены и «символы»; для эмбеддинга в chars — <strong>размерность вектора</strong>.</td>
+          <td class="col-dir neutral">Смотрите тип замера на дашборде</td>
+        </tr>
+        <tr>
+          <td>chunks / Δ</td>
+          <td>Гранулярность стрима и паузы между чанками.</td>
+          <td class="col-dir prefer-lower">По Δ: меньше — лучше</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<section class="charts charts-large" aria-label="Графики метрик">
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartTtft"></canvas></div>
+    <p class="chart-metric-help">Задержка до первого токена в <strong>стриминговом чате</strong>. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartTotal"></canvas></div>
+    <p class="chart-metric-help">Полное время одного запроса. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartE2e"></canvas></div>
+    <p class="chart-metric-help">Сквозная скорость (токены/с за весь запрос). <span class="dir">Больше — лучше.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartGen"></canvas></div>
+    <p class="chart-metric-help">Скорость генерации после первого токена. <span class="dir">Больше — лучше.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartPromptTok"></canvas></div>
+    <p class="chart-metric-help">Объём входа в токенах. <span class="dir">Не «лучше/хуже»</span> без контекста задачи.</p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartComplTok"></canvas></div>
+    <p class="chart-metric-help">Объём выхода в токенах. <span class="dir">Нейтрально.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartChars"></canvas></div>
+    <p class="chart-metric-help">Чат — символы; эмбеддинг — <strong>размерность</strong>; реранк — число результатов.</p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartChunks"></canvas></div>
+    <p class="chart-metric-help">Чанки со текстом. <span class="dir">Нейтрально.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartGapMean"></canvas></div>
+    <p class="chart-metric-help">Средняя пауза между текстовыми чанками. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+  <div class="chart-box chart-box-large">
+    <div class="chart-canvas-wrap"><canvas id="chartGapMax"></canvas></div>
+    <p class="chart-metric-help">Максимальная пауза между чанками. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+</section>
+
+<script>
+(function () {
+  const DISPLAY_TZ = 'Europe/Moscow';
+  const chartTimeOpts = {
+    timeZone: DISPLAY_TZ,
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  };
+
+  function toUtcMs(t) {
+    if (t == null || t === '') return NaN;
+    if (typeof t === 'number') return t;
+    const s = String(t).trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) return Date.parse(s + 'Z');
+    return Date.parse(s);
+  }
+
+  function formatDisplayTime(v) {
+    if (v == null || v === '') return '';
+    const ms = typeof v === 'number' ? v : toUtcMs(v);
+    if (Number.isNaN(ms)) return '';
+    return new Date(ms).toLocaleString('ru-RU', chartTimeOpts);
+  }
+
+  const colors = [
+    '#5b8def', '#3ecf8e', '#f0b429', '#e85d75', '#a78bfa', '#22d3ee',
+    '#f59e0b', '#10b981', '#ec4899', '#6366f1', '#14b8a6', '#eab308', '#8b5cf6',
+    '#06b6d4', '#ef4444', '#84cc16', '#d946ef',
+  ];
+  let charts = [];
+
+  function destroyCharts() {
+    charts.forEach(function (c) { c.destroy(); });
+    charts = [];
+  }
+
+  function truncateLegend(text, maxLen) {
+    const s = String(text || '');
+    if (s.length <= maxLen) return s;
+    return s.slice(0, maxLen - 1) + '…';
+  }
+
+  async function loadTargets() {
+    const r = await fetch('/api/targets/options', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const sel = document.getElementById('targetFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Все</option>';
+    d.targets.forEach(function (t) {
+      const o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = t.label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function mapPoints(points, key) {
+    const byLabel = {};
+    points.forEach(function (p) {
+      if (!p.success || p[key] == null) return;
+      if (!byLabel[p.label]) byLabel[p.label] = [];
+      byLabel[p.label].push({ x: toUtcMs(p.t), y: p[key] });
+    });
+    let i = 0;
+    return Object.entries(byLabel).map(function (entry) {
+      const label = entry[0];
+      const data = entry[1];
+      return {
+        label: label,
+        data: data.sort(function (a, b) { return a.x - b.x; }),
+        borderColor: colors[i++ % colors.length],
+        backgroundColor: 'transparent',
+        tension: 0.15,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderWidth: 2,
+      };
+    });
+  }
+
+  function chartOptsLarge(title, subtitle) {
+    const timeTick = function (v) { return formatDisplayTime(v); };
+    const plugins = {
+      title: {
+        display: true,
+        text: title,
+        padding: { top: 6, bottom: subtitle ? 2 : 12 },
+        font: { size: 17, weight: '600' },
+      },
+      legend: {
+        position: 'right',
+        align: 'center',
+        labels: {
+          generateLabels: function (chart) {
+            const base = Chart.defaults.plugins.legend.labels.generateLabels;
+            let items = [];
+            if (typeof base === 'function') {
+              items = base.call(this, chart);
+            } else {
+              chart.data.datasets.forEach(function (dataset, i) {
+                const meta = chart.getDatasetMeta(i);
+                items.push({
+                  text: dataset.label || '',
+                  fillStyle: dataset.borderColor,
+                  strokeStyle: dataset.borderColor,
+                  lineWidth: 2,
+                  hidden: meta.hidden,
+                  datasetIndex: i,
+                });
+              });
+            }
+            items.forEach(function (item) {
+              if (item.text) item.text = truncateLegend(item.text, 48);
+            });
+            return items;
+          },
+          boxWidth: 10,
+          boxHeight: 10,
+          padding: 6,
+          font: { size: 10, lineHeight: 1.25 },
+          usePointStyle: true,
+          pointStyle: 'line',
+        },
+      },
+      tooltip: {
+        callbacks: {
+          title: function (items) {
+            const x = items[0] && items[0].parsed.x;
+            return x != null ? formatDisplayTime(x) : '';
+          },
+          label: function (ctx) {
+            const raw = ctx.dataset.label || '';
+            const v = ctx.parsed.y;
+            return (raw.length > 56 ? raw.slice(0, 54) + '…' : raw) + ': ' + v;
+          },
+        },
+      },
+    };
+    if (subtitle) {
+      plugins.subtitle = {
+        display: true,
+        text: subtitle,
+        color: '#8b9cb3',
+        font: { size: 12, weight: '400' },
+        padding: { top: 0, bottom: 10 },
+      };
+    }
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: plugins,
+      layout: { padding: { left: 8, right: 4, bottom: 8, top: 4 } },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Время', padding: { top: 6 }, font: { size: 12 } },
+          ticks: {
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 10,
+            font: { size: 11 },
+            callback: function (v) { return timeTick(v); },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grace: '10%',
+          ticks: { maxTicksLimit: 10, font: { size: 11 } },
+        },
+      },
+    };
+  }
+
+  const CHART_SPECS = [
+    ['chartTtft', 'ttft_s', 'TTFT (с)', 'меньше — лучше'],
+    ['chartTotal', 'total_s', 'Полное время (с)', 'меньше — лучше'],
+    ['chartE2e', 'e2e_tps', 'Токены/с (e2e)', 'больше — лучше'],
+    ['chartGen', 'gen_tps', 'Токены/с (генерация)', 'больше — лучше'],
+    ['chartPromptTok', 'prompt_tokens', 'Prompt tokens', 'зависит от задачи'],
+    ['chartComplTok', 'completion_tokens', 'Completion tokens', 'нейтрально'],
+    ['chartChars', 'output_chars', 'Символов / размерность', 'смотрите тип замера'],
+    ['chartChunks', 'chunk_count', 'Чанков (стрим)', 'нейтрально'],
+    ['chartGapMean', 'inter_chunk_gap_mean_s', 'Средний зазор чанков (с)', 'меньше — лучше'],
+    ['chartGapMax', 'inter_chunk_gap_max_s', 'Макс. зазор чанков (с)', 'меньше — лучше'],
+  ];
+
+  async function refresh() {
+    const hours = document.getElementById('hours').value || 24;
+    const tid = document.getElementById('targetFilter').value;
+    let url = '/api/metrics/series?hours=' + hours;
+    if (tid) url += '&target_id=' + tid;
+    const rs = await fetch(url, { credentials: 'same-origin' });
+    if (!rs.ok) {
+      alert('Не удалось загрузить метрики (войдите заново, если сессия истекла).');
+      return;
+    }
+    const series = await rs.json();
+    destroyCharts();
+    const pts = series.points;
+    CHART_SPECS.forEach(function (spec) {
+      const el = document.getElementById(spec[0]);
+      if (!el) return;
+      charts.push(
+        new Chart(el, {
+          type: 'line',
+          data: { datasets: mapPoints(pts, spec[1]) },
+          options: chartOptsLarge(spec[2], spec[3]),
+        })
+      );
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('exportXlsxBtn').addEventListener('click', function () {
+    const hours = document.getElementById('hours').value || 24;
+    const tid = document.getElementById('targetFilter').value;
+    let u = '/api/metrics/export?hours=' + encodeURIComponent(hours);
+    if (tid) u += '&target_id=' + encodeURIComponent(tid);
+    window.location.assign(u);
+  });
+  document.getElementById('hours').addEventListener('change', refresh);
+  document.getElementById('targetFilter').addEventListener('change', refresh);
+
+  loadTargets().then(refresh);
+})();
+</script>
+{% endblock %}

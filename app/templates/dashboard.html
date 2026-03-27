@@ -1,16 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Дашборд — LLM Monitor{% endblock %}
-{% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-{% endblock %}
 {% block content %}
 <h1>Дашборд</h1>
 {% if msg == "run_bg" %}
-<p class="ok">Замеры запущены в фоне. Через некоторое время нажмите «Обновить» на графиках — новые точки появятся после завершения запросов к API.</p>
+<p class="ok">Замеры запущены в фоне. Через некоторое время обновите <a href="/dashboard/charts">графики</a> или таблицу ниже.</p>
 {% elif msg == "run_busy" %}
 <p class="muted err">Предыдущий ручной запуск замеров ещё выполняется. Дождитесь окончания или проверьте логи сервера.</p>
 {% elif msg == "metrics_cleared" %}
-<p class="ok">{% if metrics_cleared_n is not none %}Удалено записей замеров: {{ metrics_cleared_n }}. {% else %}Все сохранённые замеры удалены из базы. {% endif %}Нажмите «Обновить» у графиков — данные подтянутся заново.</p>
+<p class="ok">{% if metrics_cleared_n is not none %}Удалено записей замеров: {{ metrics_cleared_n }}. {% else %}Все сохранённые замеры удалены из базы. {% endif %}Обновите сводку ниже и страницу <a href="/dashboard/charts">«Графики»</a>.</p>
 {% elif msg == "metrics_clear_err" %}
 <p class="muted err">Не удалось очистить данные замеров. Смотрите лог сервера приложения.</p>
 {% endif %}
@@ -45,132 +42,15 @@
       <option value="">Все</option>
     </select>
   </label>
-  <button type="button" id="refreshBtn">Обновить</button>
+  <button type="button" id="refreshBtn">Обновить таблицы</button>
+  <a class="btn-link charts-link" href="/dashboard/charts">Открыть графики (крупный вид)</a>
   <button type="button" class="secondary" id="exportXlsxBtn" title="Файл .xlsx по текущему окну (часы) и фильтру цели">Скачать Excel</button>
 </section>
 
-<details class="metric-legend">
-  <summary>Справка: что означают метрики на графиках и в таблице</summary>
-  <div class="metric-legend-inner">
-    <table>
-      <thead>
-        <tr>
-          <th class="col-metric">Метрика</th>
-          <th>Что показывает</th>
-          <th class="col-dir">Как интерпретировать</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>TTFT</td>
-          <td>Время от отправки запроса до <strong>первого фрагмента текста</strong> в стриминговом чате (time to first token).</td>
-          <td class="col-dir prefer-lower">Меньше — лучше</td>
-        </tr>
-        <tr>
-          <td>Total</td>
-          <td>Полная длительность одного вызова API — от старта до готового ответа.</td>
-          <td class="col-dir prefer-lower">Меньше — лучше</td>
-        </tr>
-        <tr>
-          <td>e2e t/s</td>
-          <td>Пропускная способность «на весь запрос»: токены выхода (или оценка) делённое на полное время.</td>
-          <td class="col-dir prefer-higher">Больше — лучше</td>
-        </tr>
-        <tr>
-          <td>gen t/s</td>
-          <td>Скорость фазы генерации <strong>после первого токена</strong> (стриминг). Для нестрима часто нет смысла.</td>
-          <td class="col-dir prefer-higher">Больше — лучше</td>
-        </tr>
-        <tr>
-          <td>prompt</td>
-          <td>Размер входа в токенах (из API usage или оценка по длине текста).</td>
-          <td class="col-dir neutral">Не «лучше/хуже» — зависит от промпта и задачи</td>
-        </tr>
-        <tr>
-          <td>compl</td>
-          <td>Токены на выходе; для транскрипции часто оценка по длине расшифровки.</td>
-          <td class="col-dir neutral">Нейтрально — длина ответа не равна качеству</td>
-        </tr>
-        <tr>
-          <td>chars</td>
-          <td>Для <strong>чата</strong> — символы в ответе; для <strong>эмбеддинга</strong> — <strong>размерность вектора</strong> (не текст); для <strong>реранка</strong> — число позиций в ответе.</td>
-          <td class="col-dir neutral">Смотрите тип замера в колонке «Тип»</td>
-        </tr>
-        <tr>
-          <td>chunks</td>
-          <td>Сколько стриминговых чанков принесли непустой текст (гранулярность потока).</td>
-          <td class="col-dir neutral">Нейтрально — не метрика качества</td>
-        </tr>
-        <tr>
-          <td>Δ mean / Δ max</td>
-          <td>Средняя и максимальная пауза <strong>между чанками с текстом</strong> в стриме (секунды).</td>
-          <td class="col-dir prefer-lower">Меньше — лучше (ровнее поток)</td>
-        </tr>
-        <tr>
-          <td>N</td>
-          <td>Сколько записей замеров попало в выбранное окно времени.</td>
-          <td class="col-dir neutral">Больше — устойчивее статистика</td>
-        </tr>
-        <tr>
-          <td>Err %</td>
-          <td>Доля замеров с ошибкой (HTTP/таймаут/исключение) среди всех записей в окне.</td>
-          <td class="col-dir prefer-lower">Меньше — лучше</td>
-        </tr>
-        <tr>
-          <td>стрим / usage</td>
-          <td>Доля успешных прогонов в стриминговом режиме; доля, где токены пришли из поля <code>usage</code> API.</td>
-          <td class="col-dir neutral">Справочно, для контекста сравнения</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</details>
-
-<section class="charts" aria-label="Графики метрик">
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartTtft"></canvas></div>
-    <p class="chart-metric-help">Задержка до первого токена в <strong>стриминговом чате</strong>. Для блокирующего режима и нечатовых целей обычно нет точки. <span class="dir">Меньше — лучше.</span></p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartTotal"></canvas></div>
-    <p class="chart-metric-help">Полное время одного запроса к провайдеру. <span class="dir">Меньше — лучше.</span></p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartE2e"></canvas></div>
-    <p class="chart-metric-help">Сквозная скорость: токены выхода на секунду за весь цикл запроса. <span class="dir">Больше — лучше.</span></p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartGen"></canvas></div>
-    <p class="chart-metric-help">Скорость генерации после появления первого токена (стрим). <span class="dir">Больше — лучше.</span> Для нестрима часто пусто.</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartPromptTok"></canvas></div>
-    <p class="chart-metric-help">Объём входа в токенах. <span class="dir">Не показатель «лучше/хуже»</span> — зависит от промпта; сравнивайте при той же задаче.</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartComplTok"></canvas></div>
-    <p class="chart-metric-help">Объём выхода в токенах (или оценка). <span class="dir">Нейтрально</span> — длина ответа не равна качеству модели.</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartChars"></canvas></div>
-    <p class="chart-metric-help">Для чата — символы ответа; для <strong>эмбеддинга</strong> здесь <strong>размерность вектора</strong>; для реранка — число результатов. Смотрите колонку «Тип» в сводке.</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartChunks"></canvas></div>
-    <p class="chart-metric-help">Сколько чанков стрима содержали текст. <span class="dir">Нейтрально</span> — про дробность потока, не про качество.</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartGapMean"></canvas></div>
-    <p class="chart-metric-help">Средняя пауза между соседними «текстовыми» чанками в стриме. <span class="dir">Меньше — лучше</span> (плавнее отдача).</p>
-  </div>
-  <div class="chart-box">
-    <div class="chart-canvas-wrap"><canvas id="chartGapMax"></canvas></div>
-    <p class="chart-metric-help">Самая длинная пауза между чанками — индикатор «заикания» потока. <span class="dir">Меньше — лучше.</span></p>
-  </div>
-</section>
+<p class="muted">Сводка и ошибки — ниже. Линейные графики вынесены на <a href="/dashboard/charts"><strong>страницу «Графики»</strong></a> (одна колонка, увеличенная высота, легенда справа). Краткие подсказки по столбцам — наведите курсор на заголовок.</p>
 
 <h2>Сводка (успешные замеры: p50 / p95)</h2>
-<p class="muted">В ячейках — медиана и 95-й перцентиль. Наведите курсор на заголовок столбца для краткой подсказки. Доли стрима и usage — среди успешных прогонов. Развёрнутая справка — блок «Справка» выше.</p>
+<p class="muted">Полная справка по метрикам — на странице «Графики». Доли стрима и usage — среди успешных прогонов.</p>
 <div class="table-wrap">
   <table class="data dashboard-summary" id="summaryTable">
     <thead>
@@ -219,7 +99,6 @@
 {% endif %}
 <script>
 (async function () {
-  /** Отображение времени замеров и планировщика: Москва (UTC+3, без перехода на летнее). */
   const DISPLAY_TZ = 'Europe/Moscow';
   const chartTimeOpts = {
     timeZone: DISPLAY_TZ,
@@ -230,7 +109,7 @@
     minute: '2-digit',
     second: '2-digit',
   };
-  /** Naive ISO из SQLite без Z/+offset браузер считает локальным временем — принудительно UTC. */
+
   function toUtcMs(t) {
     if (t == null || t === '') return NaN;
     if (typeof t === 'number') return t;
@@ -238,19 +117,12 @@
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) return Date.parse(s + 'Z');
     return Date.parse(s);
   }
+
   function formatDisplayTime(v) {
     if (v == null || v === '') return '';
     const ms = typeof v === 'number' ? v : toUtcMs(v);
     if (Number.isNaN(ms)) return '';
     return new Date(ms).toLocaleString('ru-RU', chartTimeOpts);
-  }
-
-  const colors = ['#5b8def', '#3ecf8e', '#f0b429', '#e85d75', '#a78bfa', '#22d3ee'];
-  let charts = [];
-
-  function destroyCharts() {
-    charts.forEach(c => c.destroy());
-    charts = [];
   }
 
   async function loadTargets() {
@@ -267,91 +139,6 @@
       sel.appendChild(o);
     });
     if (cur) sel.value = cur;
-  }
-
-  function mapPoints(points, key) {
-    const byLabel = {};
-    points.forEach(p => {
-      if (!p.success || p[key] == null) return;
-      if (!byLabel[p.label]) byLabel[p.label] = [];
-      byLabel[p.label].push({ x: toUtcMs(p.t), y: p[key] });
-    });
-    let i = 0;
-    return Object.entries(byLabel).map(([label, data]) => ({
-      label,
-      data: data.sort((a,b) => a.x - b.x),
-      borderColor: colors[i++ % colors.length],
-      backgroundColor: 'transparent',
-      tension: 0.15,
-      pointRadius: 3,
-      pointHoverRadius: 5,
-      borderWidth: 2,
-    }));
-  }
-
-  function chartOpts(title, subtitle) {
-    const timeTick = (v) => formatDisplayTime(v);
-    const plugins = {
-        title: {
-          display: true,
-          text: title,
-          padding: { top: 4, bottom: subtitle ? 2 : 10 },
-          font: { size: 15, weight: '600' },
-        },
-        legend: {
-          position: 'bottom',
-          align: 'start',
-          labels: {
-            boxWidth: 14,
-            boxHeight: 8,
-            padding: 10,
-            font: { size: 11 },
-            usePointStyle: true,
-            pointStyle: 'line',
-          },
-        },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const x = items[0] && items[0].parsed.x;
-              return x != null ? formatDisplayTime(x) : '';
-            },
-          },
-        },
-    };
-    if (subtitle) {
-      plugins.subtitle = {
-        display: true,
-        text: subtitle,
-        color: '#8b9cb3',
-        font: { size: 11, weight: '400' },
-        padding: { top: 0, bottom: 8 },
-      };
-    }
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'nearest', intersect: false },
-      plugins,
-      layout: { padding: { left: 4, right: 8, bottom: 4, top: 2 } },
-      scales: {
-        x: {
-          type: 'linear',
-          title: { display: true, text: 'Время', padding: { top: 4 } },
-          ticks: {
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 8,
-            callback: (v) => timeTick(v),
-          },
-        },
-        y: {
-          beginAtZero: true,
-          grace: '12%',
-          ticks: { maxTicksLimit: 8 },
-        },
-      },
-    };
   }
 
   function fmtPair(obj, dec) {
@@ -374,19 +161,6 @@
       .replace(/"/g, '&quot;');
   }
 
-  const CHART_SPECS = [
-    ['chartTtft', 'ttft_s', 'TTFT (с)', 'меньше — лучше'],
-    ['chartTotal', 'total_s', 'Полное время (с)', 'меньше — лучше'],
-    ['chartE2e', 'e2e_tps', 'Токены/с (e2e)', 'больше — лучше'],
-    ['chartGen', 'gen_tps', 'Токены/с (генерация)', 'больше — лучше'],
-    ['chartPromptTok', 'prompt_tokens', 'Prompt tokens', 'зависит от задачи'],
-    ['chartComplTok', 'completion_tokens', 'Completion tokens', 'нейтрально'],
-    ['chartChars', 'output_chars', 'Символов / размерность', 'смотрите тип замера'],
-    ['chartChunks', 'chunk_count', 'Чанков (стрим)', 'нейтрально'],
-    ['chartGapMean', 'inter_chunk_gap_mean_s', 'Средний зазор чанков (с)', 'меньше — лучше'],
-    ['chartGapMax', 'inter_chunk_gap_max_s', 'Макс. зазор чанков (с)', 'меньше — лучше'],
-  ];
-
   async function refresh() {
     const hours = document.getElementById('hours').value || 24;
     const tid = document.getElementById('targetFilter').value;
@@ -402,20 +176,7 @@
     }
     const series = await rs.json();
     const summary = await ru.json();
-
-    destroyCharts();
     const pts = series.points;
-    CHART_SPECS.forEach(function (spec) {
-      const el = document.getElementById(spec[0]);
-      if (!el) return;
-      charts.push(
-        new Chart(el, {
-          type: 'line',
-          data: { datasets: mapPoints(pts, spec[1]) },
-          options: chartOpts(spec[2], spec[3]),
-        })
-      );
-    });
 
     const tb = document.querySelector('#summaryTable tbody');
     tb.innerHTML = '';
@@ -478,9 +239,9 @@
   document.getElementById('exportXlsxBtn').addEventListener('click', function () {
     const hours = document.getElementById('hours').value || 24;
     const tid = document.getElementById('targetFilter').value;
-    let url = '/api/metrics/export?hours=' + encodeURIComponent(hours);
-    if (tid) url += '&target_id=' + encodeURIComponent(tid);
-    window.location.assign(url);
+    let exportUrl = '/api/metrics/export?hours=' + encodeURIComponent(hours);
+    if (tid) exportUrl += '&target_id=' + encodeURIComponent(tid);
+    window.location.assign(exportUrl);
   });
   document.getElementById('hours').addEventListener('change', refresh);
   document.getElementById('targetFilter').addEventListener('change', refresh);

@@ -25,7 +25,7 @@
 
 ## API (кратко)
 
-Публичные HTML-маршруты определены в `app/routers/pages.py` (login, setup, dashboard, admin-разделы).
+Публичные HTML-маршруты определены в `app/routers/pages.py` (login, setup, `/dashboard` — сводка и ошибки, `/dashboard/charts` — крупные графики Chart.js, admin-разделы).
 
 Под `/api` (см. `app/main.py` — префикс задаётся при подключении роутеров):
 

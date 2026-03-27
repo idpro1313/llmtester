@@ -20,7 +20,7 @@ _log = logging.getLogger(ACCESS_LOGGER_NAME)
 _SKIP_PATH_PREFIXES = ("/static/", "/api/")
 _SKIP_PATHS = frozenset({"/health", "/favicon.ico", "/api"})
 # GET к «просмотру» страниц не засоряют лог; изменения — POST (и редкие GET вне списка).
-_SKIP_GET_PATHS = frozenset({"/", "/dashboard", "/login", "/setup", "/logout"})
+_SKIP_GET_PATHS = frozenset({"/", "/dashboard", "/dashboard/charts", "/login", "/setup", "/logout"})
 _ADMIN_PREFIX = "/admin/"
 
 

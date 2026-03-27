@@ -354,3 +354,28 @@ button.secondary {
   color: var(--accent);
   text-decoration: none;
 }
+
+/* Страница /dashboard/charts — шире main, графики в одну колонку, выше по вертикали */
+.main.charts-wide {
+  max-width: min(98vw, 1920px);
+}
+
+.charts-page-intro a {
+  color: var(--accent);
+}
+
+.charts-large {
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.charts-large .chart-box-large {
+  min-height: 440px;
+  height: clamp(440px, 52vh, 780px);
+  max-height: 820px;
+}
+
+.controls .charts-link {
+  align-self: center;
+}

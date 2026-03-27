@@ -31,6 +31,7 @@
     <file path="app/log_reader.py" module="M-PAGES" role="logs_ui"/>
     <file path="app/local_secrets.py" module="M-CONFIG" role="session_secret_file"/>
     <file path="VERSION" module="M-APP" role="semver_source"/>
+    <file path="app/templates/dashboard_charts.html" module="M-PAGES" role="charts_page"/>
     <directory path="app/templates/" module="M-PAGES" kind="jinja2"/>
     <directory path="app/static/" module="M-PAGES" kind="static"/>
   </nodes>

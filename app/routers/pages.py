@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # GRACE[M-PAGES][HTTP][BLOCK_UIRouter]
-# CONTRACT: Jinja2-страницы, setup/login, dashboard, admin; GET /health + version.
+# CONTRACT: Jinja2-страницы, setup/login, /dashboard, /dashboard/charts, admin; GET /health + version.
 
 import logging
 from pathlib import Path
@@ -165,6 +165,14 @@ def dashboard(request: Request, db: Annotated[Session, Depends(get_db)]):
         msg=msg,
         metrics_cleared_n=metrics_cleared_n,
     )
+
+
+@router.get("/dashboard/charts")
+def dashboard_charts(request: Request, db: Annotated[Session, Depends(get_db)]):
+    u = _need_user(request, db)
+    if isinstance(u, RedirectResponse):
+        return u
+    return _tpl(request, "dashboard_charts.html", user=u)
 
 
 @router.get("/admin/providers")
