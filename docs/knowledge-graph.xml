@@ -33,6 +33,7 @@
     <file path="VERSION" module="M-APP" role="semver_source"/>
     <file path="app/templates/dashboard_charts.html" module="M-PAGES" role="charts_page"/>
     <directory path="app/templates/" module="M-PAGES" kind="jinja2"/>
+    <file path="app/static/favicon.svg" module="M-APP" role="favicon"/>
     <directory path="app/static/" module="M-PAGES" kind="static"/>
   </nodes>
   <edges>

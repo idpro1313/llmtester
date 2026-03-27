@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -55,6 +56,11 @@ def create_app() -> FastAPI:
     app.include_router(api_metrics.router, prefix="/api")
     app.include_router(api_providers.router, prefix="/api")
     app.include_router(api_scheduler.router, prefix="/api")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon_redirect():
+        return RedirectResponse(url="/static/favicon.svg", status_code=302)
+
     static_dir = Path(__file__).resolve().parent / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
