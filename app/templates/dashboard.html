@@ -49,41 +49,148 @@
   <button type="button" class="secondary" id="exportXlsxBtn" title="Файл .xlsx по текущему окну (часы) и фильтру цели">Скачать Excel</button>
 </section>
 
+<details class="metric-legend">
+  <summary>Справка: что означают метрики на графиках и в таблице</summary>
+  <div class="metric-legend-inner">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-metric">Метрика</th>
+          <th>Что показывает</th>
+          <th class="col-dir">Как интерпретировать</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>TTFT</td>
+          <td>Время от отправки запроса до <strong>первого фрагмента текста</strong> в стриминговом чате (time to first token).</td>
+          <td class="col-dir prefer-lower">Меньше — лучше</td>
+        </tr>
+        <tr>
+          <td>Total</td>
+          <td>Полная длительность одного вызова API — от старта до готового ответа.</td>
+          <td class="col-dir prefer-lower">Меньше — лучше</td>
+        </tr>
+        <tr>
+          <td>e2e t/s</td>
+          <td>Пропускная способность «на весь запрос»: токены выхода (или оценка) делённое на полное время.</td>
+          <td class="col-dir prefer-higher">Больше — лучше</td>
+        </tr>
+        <tr>
+          <td>gen t/s</td>
+          <td>Скорость фазы генерации <strong>после первого токена</strong> (стриминг). Для нестрима часто нет смысла.</td>
+          <td class="col-dir prefer-higher">Больше — лучше</td>
+        </tr>
+        <tr>
+          <td>prompt</td>
+          <td>Размер входа в токенах (из API usage или оценка по длине текста).</td>
+          <td class="col-dir neutral">Не «лучше/хуже» — зависит от промпта и задачи</td>
+        </tr>
+        <tr>
+          <td>compl</td>
+          <td>Токены на выходе; для транскрипции часто оценка по длине расшифровки.</td>
+          <td class="col-dir neutral">Нейтрально — длина ответа не равна качеству</td>
+        </tr>
+        <tr>
+          <td>chars</td>
+          <td>Для <strong>чата</strong> — символы в ответе; для <strong>эмбеддинга</strong> — <strong>размерность вектора</strong> (не текст); для <strong>реранка</strong> — число позиций в ответе.</td>
+          <td class="col-dir neutral">Смотрите тип замера в колонке «Тип»</td>
+        </tr>
+        <tr>
+          <td>chunks</td>
+          <td>Сколько стриминговых чанков принесли непустой текст (гранулярность потока).</td>
+          <td class="col-dir neutral">Нейтрально — не метрика качества</td>
+        </tr>
+        <tr>
+          <td>Δ mean / Δ max</td>
+          <td>Средняя и максимальная пауза <strong>между чанками с текстом</strong> в стриме (секунды).</td>
+          <td class="col-dir prefer-lower">Меньше — лучше (ровнее поток)</td>
+        </tr>
+        <tr>
+          <td>N</td>
+          <td>Сколько записей замеров попало в выбранное окно времени.</td>
+          <td class="col-dir neutral">Больше — устойчивее статистика</td>
+        </tr>
+        <tr>
+          <td>Err %</td>
+          <td>Доля замеров с ошибкой (HTTP/таймаут/исключение) среди всех записей в окне.</td>
+          <td class="col-dir prefer-lower">Меньше — лучше</td>
+        </tr>
+        <tr>
+          <td>стрим / usage</td>
+          <td>Доля успешных прогонов в стриминговом режиме; доля, где токены пришли из поля <code>usage</code> API.</td>
+          <td class="col-dir neutral">Справочно, для контекста сравнения</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
 <section class="charts" aria-label="Графики метрик">
-  <div class="chart-box"><canvas id="chartTtft"></canvas></div>
-  <div class="chart-box"><canvas id="chartTotal"></canvas></div>
-  <div class="chart-box"><canvas id="chartE2e"></canvas></div>
-  <div class="chart-box"><canvas id="chartGen"></canvas></div>
-  <div class="chart-box"><canvas id="chartPromptTok"></canvas></div>
-  <div class="chart-box"><canvas id="chartComplTok"></canvas></div>
-  <div class="chart-box"><canvas id="chartChars"></canvas></div>
-  <div class="chart-box"><canvas id="chartChunks"></canvas></div>
-  <div class="chart-box"><canvas id="chartGapMean"></canvas></div>
-  <div class="chart-box"><canvas id="chartGapMax"></canvas></div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartTtft"></canvas></div>
+    <p class="chart-metric-help">Задержка до первого токена в <strong>стриминговом чате</strong>. Для блокирующего режима и нечатовых целей обычно нет точки. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartTotal"></canvas></div>
+    <p class="chart-metric-help">Полное время одного запроса к провайдеру. <span class="dir">Меньше — лучше.</span></p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartE2e"></canvas></div>
+    <p class="chart-metric-help">Сквозная скорость: токены выхода на секунду за весь цикл запроса. <span class="dir">Больше — лучше.</span></p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartGen"></canvas></div>
+    <p class="chart-metric-help">Скорость генерации после появления первого токена (стрим). <span class="dir">Больше — лучше.</span> Для нестрима часто пусто.</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartPromptTok"></canvas></div>
+    <p class="chart-metric-help">Объём входа в токенах. <span class="dir">Не показатель «лучше/хуже»</span> — зависит от промпта; сравнивайте при той же задаче.</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartComplTok"></canvas></div>
+    <p class="chart-metric-help">Объём выхода в токенах (или оценка). <span class="dir">Нейтрально</span> — длина ответа не равна качеству модели.</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartChars"></canvas></div>
+    <p class="chart-metric-help">Для чата — символы ответа; для <strong>эмбеддинга</strong> здесь <strong>размерность вектора</strong>; для реранка — число результатов. Смотрите колонку «Тип» в сводке.</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartChunks"></canvas></div>
+    <p class="chart-metric-help">Сколько чанков стрима содержали текст. <span class="dir">Нейтрально</span> — про дробность потока, не про качество.</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartGapMean"></canvas></div>
+    <p class="chart-metric-help">Средняя пауза между соседними «текстовыми» чанками в стриме. <span class="dir">Меньше — лучше</span> (плавнее отдача).</p>
+  </div>
+  <div class="chart-box">
+    <div class="chart-canvas-wrap"><canvas id="chartGapMax"></canvas></div>
+    <p class="chart-metric-help">Самая длинная пауза между чанками — индикатор «заикания» потока. <span class="dir">Меньше — лучше.</span></p>
+  </div>
 </section>
 
 <h2>Сводка (успешные замеры: p50 / p95)</h2>
-<p class="muted">Доля стрима и usage из API — среди успешных прогонов в окне.</p>
+<p class="muted">В ячейках — медиана и 95-й перцентиль. Наведите курсор на заголовок столбца для краткой подсказки. Доли стрима и usage — среди успешных прогонов. Развёрнутая справка — блок «Справка» выше.</p>
 <div class="table-wrap">
   <table class="data dashboard-summary" id="summaryTable">
     <thead>
       <tr>
-        <th title="Цель мониторинга">Цель</th>
-        <th title="Тип замера (чат / эмбеддинг / реранк / аудио)">Тип</th>
-        <th title="Всего записей">N</th>
-        <th title="Доля ошибок">Err %</th>
-        <th title="TTFT, с">TTFT</th>
-        <th title="Полное время, с">Total</th>
-        <th title="Токены/с end-to-end">e2e t/s</th>
-        <th title="Токены/с фаза генерации">gen t/s</th>
-        <th title="Prompt tokens">prompt</th>
-        <th title="Completion tokens">compl</th>
-        <th title="Символов в ответе">chars</th>
-        <th title="Чанков со текстом">chunks</th>
-        <th title="Средний зазор между чанками, с">Δ mean</th>
-        <th title="Макс. зазор между чанками, с">Δ max</th>
-        <th title="Доля стриминговых запросов">стрим</th>
-        <th title="Доля замеров, где токены из usage API">usage</th>
+        <th title="Провайдер и модель цели мониторинга.">Цель</th>
+        <th title="Тип API-замера: чат, эмбеддинг, реранк или аудио→текст. От типа зависит смысл колонок prompt/chars.">Тип</th>
+        <th title="Число записей замеров в выбранном окне времени. Больше записей — устойчивее статистика; само по себе не «качество».">N</th>
+        <th title="Процент неуспешных замеров (ошибки API, таймауты). Меньше — лучше.">Err %</th>
+        <th title="Время до первого токена в стриминге (с). Только для стримингового чата; меньше — лучше.">TTFT</th>
+        <th title="Полное время запроса от начала до конца (с). Универсальная задержка; меньше — лучше.">Total</th>
+        <th title="Токены выхода в секунду за полный цикл запроса (сквозная скорость). Больше — лучше.">e2e t/s</th>
+        <th title="Токены в секунду после первого токена (фаза генерации в стриме). Больше — лучше; для нестрима часто пусто.">gen t/s</th>
+        <th title="Токены на входе. Не метрика качества — зависит от длины промпта; сравнивайте при одинаковой задаче.">prompt</th>
+        <th title="Токены на выходе (или оценка). Нейтрально: длина ответа не равна лучше/хуже.">compl</th>
+        <th title="Для чата — символы ответа; для эмбеддинга — размерность вектора; для реранка — число результатов. Смотрите колонку «Тип».">chars</th>
+        <th title="Число стриминговых чанков с текстом. Нейтрально — про гранулярность потока.">chunks</th>
+        <th title="Средняя пауза между чанками с текстом (с). Меньше — плавнее стрим.">Δ mean</th>
+        <th title="Максимальная пауза между чанками (с). Меньше — меньше «заиканий».">Δ max</th>
+        <th title="Доля успешных прогонов, выполненных в режиме стриминга. Справочно.">стрим</th>
+        <th title="Доля замеров, где числа токенов взяты из поля usage ответа API. Справочно.">usage</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -96,10 +203,10 @@
     <table class="data" id="failuresTable">
       <thead>
         <tr>
-          <th>Время</th>
-          <th>Цель</th>
-          <th>HTTP</th>
-          <th>Сообщение</th>
+          <th title="Момент замера (МСК на дашборде).">Время</th>
+          <th title="Цель и тип замера.">Цель</th>
+          <th title="Код ответа HTTP при ошибке, если есть.">HTTP</th>
+          <th title="Текст ошибки от провайдера или клиента.">Сообщение</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -182,17 +289,13 @@
     }));
   }
 
-  function chartOpts(title) {
+  function chartOpts(title, subtitle) {
     const timeTick = (v) => formatDisplayTime(v);
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'nearest', intersect: false },
-      plugins: {
+    const plugins = {
         title: {
           display: true,
           text: title,
-          padding: { top: 4, bottom: 10 },
+          padding: { top: 4, bottom: subtitle ? 2 : 10 },
           font: { size: 15, weight: '600' },
         },
         legend: {
@@ -215,7 +318,21 @@
             },
           },
         },
-      },
+    };
+    if (subtitle) {
+      plugins.subtitle = {
+        display: true,
+        text: subtitle,
+        color: '#8b9cb3',
+        font: { size: 11, weight: '400' },
+        padding: { top: 0, bottom: 8 },
+      };
+    }
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins,
       layout: { padding: { left: 4, right: 8, bottom: 4, top: 2 } },
       scales: {
         x: {
@@ -258,16 +375,16 @@
   }
 
   const CHART_SPECS = [
-    ['chartTtft', 'ttft_s', 'TTFT (с)'],
-    ['chartTotal', 'total_s', 'Полное время (с)'],
-    ['chartE2e', 'e2e_tps', 'Токены/с (e2e)'],
-    ['chartGen', 'gen_tps', 'Токены/с (генерация)'],
-    ['chartPromptTok', 'prompt_tokens', 'Prompt tokens'],
-    ['chartComplTok', 'completion_tokens', 'Completion tokens'],
-    ['chartChars', 'output_chars', 'Символов в ответе'],
-    ['chartChunks', 'chunk_count', 'Чанков (стрим)'],
-    ['chartGapMean', 'inter_chunk_gap_mean_s', 'Средний зазор чанков (с)'],
-    ['chartGapMax', 'inter_chunk_gap_max_s', 'Макс. зазор чанков (с)'],
+    ['chartTtft', 'ttft_s', 'TTFT (с)', 'меньше — лучше'],
+    ['chartTotal', 'total_s', 'Полное время (с)', 'меньше — лучше'],
+    ['chartE2e', 'e2e_tps', 'Токены/с (e2e)', 'больше — лучше'],
+    ['chartGen', 'gen_tps', 'Токены/с (генерация)', 'больше — лучше'],
+    ['chartPromptTok', 'prompt_tokens', 'Prompt tokens', 'зависит от задачи'],
+    ['chartComplTok', 'completion_tokens', 'Completion tokens', 'нейтрально'],
+    ['chartChars', 'output_chars', 'Символов / размерность', 'смотрите тип замера'],
+    ['chartChunks', 'chunk_count', 'Чанков (стрим)', 'нейтрально'],
+    ['chartGapMean', 'inter_chunk_gap_mean_s', 'Средний зазор чанков (с)', 'меньше — лучше'],
+    ['chartGapMax', 'inter_chunk_gap_max_s', 'Макс. зазор чанков (с)', 'меньше — лучше'],
   ];
 
   async function refresh() {
@@ -295,7 +412,7 @@
         new Chart(el, {
           type: 'line',
           data: { datasets: mapPoints(pts, spec[1]) },
-          options: chartOpts(spec[2]),
+          options: chartOpts(spec[2], spec[3]),
         })
       );
     });

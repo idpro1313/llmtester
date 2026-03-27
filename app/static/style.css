@@ -153,20 +153,79 @@ button.link.danger { color: var(--err); }
 .chart-box {
   width: 100%;
   min-height: 300px;
-  height: clamp(300px, 38vh, 520px);
-  max-height: 520px;
+  height: clamp(320px, 40vh, 540px);
+  max-height: 560px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.65rem 0.75rem 0.5rem;
   position: relative;
   grid-column: auto;
+  display: flex;
+  flex-direction: column;
 }
-.chart-box canvas {
+.chart-canvas-wrap {
+  flex: 1;
+  min-height: 200px;
+  position: relative;
+}
+.chart-canvas-wrap canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
 }
+.chart-metric-help {
+  margin: 0.45rem 0 0;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.chart-metric-help .dir {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.metric-legend {
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.metric-legend summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+.metric-legend-inner {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+.metric-legend table {
+  width: 100%;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+}
+.metric-legend th,
+.metric-legend td {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.metric-legend th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.metric-legend .col-metric { min-width: 8rem; }
+.metric-legend .col-dir { white-space: nowrap; }
+.metric-legend .col-dir.prefer-higher { color: var(--ok); }
+.metric-legend .col-dir.prefer-lower { color: var(--accent); }
+.metric-legend .col-dir.neutral { color: var(--muted); }
 
 .data.dashboard-summary {
   font-size: 0.8rem;
