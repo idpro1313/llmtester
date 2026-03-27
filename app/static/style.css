@@ -355,9 +355,14 @@ button.secondary {
   text-decoration: none;
 }
 
-/* Страница /dashboard/charts — шире main, графики в одну колонку, выше по вертикали */
+/* Страница /dashboard/charts — на всю ширину окна, по одному графику в ряд, крупная высота */
 .main.charts-wide {
-  max-width: min(98vw, 1920px);
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding-left: max(1rem, 2.5vw);
+  padding-right: max(1rem, 2.5vw);
+  box-sizing: border-box;
 }
 
 .charts-page-intro a {
@@ -365,15 +370,23 @@ button.secondary {
 }
 
 .charts-large {
+  display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  gap: 1.75rem;
+  margin: 1rem 0 2.5rem;
+  width: 100%;
 }
 
 .charts-large .chart-box-large {
-  min-height: 440px;
-  height: clamp(440px, 52vh, 780px);
-  max-height: 820px;
+  width: 100%;
+  max-width: none;
+  min-height: min(520px, 70vh);
+  height: min(72vh, 980px);
+  max-height: none;
+}
+
+.charts-large .chart-box-large .chart-canvas-wrap {
+  min-height: min(420px, 58vh);
 }
 
 .controls .charts-link {
